@@ -252,13 +252,15 @@ class Scraper(object):
         while 'extends' in instruction:
             extends = instruction.pop('extends')
             if isinstance(extends, basestring):
-                self._extend_instruction(instruction, self._load_uri(req.uri, extends))
+                loaded_instruction, target_uri = self._load_uri(req.uri, extends)
+                self._extend_instruction(instruction, loaded_instruction)
             elif isinstance(extends, dict):
                 self._extend_instruction(instruction, extends)
             elif isinstance(extends, list):
                 for ex in extends:
                     if isinstance(ex, basestring):
-                        self._extend_instruction(instruction, self._load_uri(req.uri, ex))
+                        loaded_instruction, target_uri = self._load_uri(req.uri, ex)
+                        self._extend_instruction(instruction, loaded_instruction)
                     elif isinstance(ex, dict):
                         self._extend_instruction(instruction, ex)
                     else:
@@ -304,7 +306,7 @@ class Scraper(object):
                 return MissingTags(self, instructionSub.missingTags)
             instruction, uri = self._load_uri(uri, instructionSub.result)
 
-        req = Request(instruction, tags, input, force, uri, req_id)
+        req = Request(instruction, tags, input, force, req_id, uri)
 
         # Handle each element of list separately within this context.
         if isinstance(instruction, list):

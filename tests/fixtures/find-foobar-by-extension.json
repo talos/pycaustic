@@ -1,0 +1,5 @@
+{
+    "extends": [
+        "find-foobar.json"
+    ]
+}

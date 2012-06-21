@@ -62,6 +62,19 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             'value': 'foobar'
         }, resp.results[0].as_dict())
 
+    def test_filesystem_ref(self):
+        """
+        Test loading in some JSON by reference in extends
+        """
+        instruction = 'fixtures/find-foobar-by-extension.json'
+        resp = Scraper().scrape(instruction, input="foobar baz boo",
+                                uri= FILE_PATH)
+
+        self.assertEquals('found', resp.status)
+        self.assertEquals({
+            'value': 'foobar'
+        }, resp.results[0].as_dict())
+
     def test_needs_force(self):
         """
         Don't load anything without force!
