@@ -47,7 +47,14 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertIsNone(result.children)
 
 
-    def xtest_simple_google_request(self):
+    def test_needs_force(self):
+        """
+        Don't load anything without force!
+        """
+        resp = Scraper().scrape({'load':'http://www.google.com'})
+        self.assertEquals('wait', resp.status)
+
+    def test_simple_google_request(self):
         """
         Test a very straightforward request to Google to look for "I'm feeling
         lucky".
@@ -56,10 +63,11 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "load"  : "http://www.google.com",
             "then" : {
                 "find" : "Feeling\\s[\\w]*",
-                "name" : "Feeling?"
+                "name" : "Feeling?",
+                "match": 0
             }
         }
-        resp = Scraper(instruction).scrape()
+        resp = Scraper().scrape(instruction, force=True)
 
         # Outer level
         self.assertEquals('loaded', resp.status)
@@ -85,7 +93,7 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         result = results[0]
 
         # Whose value should be the word after "Feeling"
-        self.assertEquals('lucky', result.value)
+        self.assertEquals('Feeling Lucky', result.value)
 
         # And which has no children
         self.assertIsNone(result.children)

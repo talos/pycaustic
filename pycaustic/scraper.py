@@ -6,7 +6,7 @@ import copy
 import os
 
 from .patterns import Regex
-from .responses import ( DoneLoad, DoneFind, Wait, MissingTags, Reference,
+from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
                          Failed, Result )
 from .templates import Substitution
 from .errors import InvalidInstruction
@@ -58,13 +58,6 @@ class Scraper(object):
         """
         raise NotImplementedError('Remotely constructed instructions not yet supported')
 
-    def _run_children(self, input, then):
-        """
-        Run a series of children with new input.
-        """
-        # similar to scrape, except we don't return a Referenced in case of array
-        pass
-
     def _scrape_find(self, req, instruction, description, then):
         """
         Scrape a find instruction
@@ -88,6 +81,9 @@ class Scraper(object):
         min_match = min_match if match is None else match
         max_match = max_match if match is None else match
 
+        # Python counts a little differently
+        max_match = None if max_match == -1 else max_match + 1
+
         missing_tags = Substitution.add_missing(findSub, replaceSub, nameSub)
         if len(missing_tags):
             return MissingTags(req, missing_tags)
@@ -98,23 +94,32 @@ class Scraper(object):
 
         regex = Regex(findSub.result, ignore_case, multiline, dot_matches_all, replace)
 
+        # Negative max means we can't utilize the generator, sadly...
+        subs = [s for s in regex.substitutions(req.input)][min_match:max_match]
+
         results = []
-        for substitution in regex.substitutions(req.input):
-            results.append(Result(substitution, self._run_children(substitution, then)))
+        # Call children once for each substitution, using it as input
+        # and with a modified set of tags.
+        for s in subs:
+            fork_tags = copy.deepcopy(req.tags)
+            fork_tags[name] = s
+            results.append(Result(s, Scraper(self._session).scrape(then,
+                                                                   fork_tags,
+                                                                   s)))
 
         if len(results):
             return DoneFind(req, name, description, results)
         else:
             return Failed(req, "No matches")
 
-    def _scrape_load(self, req, instruction, force, description, then):
+    def _scrape_load(self, req, instruction, description, then):
         """
         Scrape a load instruction
 
         :returns: DoneLoad, Wait, MissingTags, or Failed
         """
-        if 'url' not in instruction:
-            raise InvalidInstruction("Missing URL")
+        if 'load' not in instruction:
+            raise InvalidInstruction("Missing URL in `load` key")
 
         method = instruction.get('method', 'get')
         if method not in ['head', 'get', 'post']:
@@ -122,7 +127,7 @@ class Scraper(object):
         else:
             requester = getattr(self._session, method)
 
-        urlSub = Substitution(instruction['url'], req.tags)
+        urlSub = Substitution(instruction['load'], req.tags)
         nameSub = Substitution(instruction.get('name'), req.tags)
         postsSub = Substitution(instruction.get('posts'), req.tags)
         cookiesSub = Substitution(instruction.get('cookies', {}), req.tags)
@@ -137,7 +142,7 @@ class Scraper(object):
         url = urlSub.result
         name = nameSub.result if nameSub.result else url
 
-        if instruction.get('force') != True:
+        if req.force != True:
             return Wait(req, name, description)
 
         posts = postsSub.result
@@ -151,13 +156,15 @@ class Scraper(object):
 
             resp = requester(urlSub.result, **opts)
             if resp.status_code == 200:
-                children = self._run_children(resp.text, then)
-                result = Result(resp.text, children)
-                return DoneLoad(req, name, description, result)
+                # Call children using the response text as input
+                result = Result(resp.text, Scraper(self._session).scrape(then,
+                                                                         req.tags,
+                                                                         resp.text))
+                return DoneLoad(req, name, description, result, resp.cookies.get_dict())
             else:
                 return Failed(req, "Status code %s from %s" % (
                     resp.status_code, url))
-        except requests.exception.RequestException as e:
+        except requests.exceptions.RequestException as e:
             return Failed(req, str(e))
 
     def _scrape_dict(self, req, instruction):
@@ -201,7 +208,7 @@ class Scraper(object):
         :param: (optional) id ID for request
         :type: str
 
-        :returns: Response
+        :returns: Response or list of Responses
         """
 
         # Have to track down the instruction.
@@ -217,12 +224,12 @@ class Scraper(object):
 
         # Handle each element of list separately within this context.
         if isinstance(instruction, list):
-            resps = []
-            for i in instruction:
-                clone = Scraper(self._session)
-                resps.append(clone.scrape(i, tags, input, False, **kwargs))
-
-            return Reference(req, resps)
+            return map(lambda i: Scraper(self._session).scrape(i,
+                                                               tags,
+                                                               input,
+                                                               force,
+                                                               **kwargs),
+                      instruction)
 
         # Dict instructions are ones we can actually handle
         elif isinstance(instruction, dict):

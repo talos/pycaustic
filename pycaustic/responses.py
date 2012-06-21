@@ -6,12 +6,24 @@ class Result(object):
     """
     def __init__(self, value, children=None):
         self._value = value
-        self._children = children
         self._as_dict = {
             'value': value
         }
-        if children is not None:
-            self._as_dict['children'] = [child._as_dict() for child in children]
+        if children is None:
+            self._children = None
+        else:
+            if isinstance(children, list):
+                if len(children) > 0:
+                    self._children = children
+                    self._as_dict['children'] = [child.as_dict() for child in children]
+                else:
+                    self._children = None
+                    self._as_dict['children'] = None
+            elif isinstance(children, Response):
+                self._children = [children]
+                self._as_dict['children'] = [children.as_dict()]
+            else:
+                raise TypeError('result children must be response or list')
 
     @property
     def value(self):
@@ -141,25 +153,6 @@ class Wait(Response):
 
     def _status(self):
         return 'wait'
-
-
-class Reference(Response):
-    """
-    Reference caustic response.
-    """
-    def __init__(self, request, referenced):
-        super(Reference, self).__init__(request)
-        self._referenced = referenced
-        self._as_dict.update({
-            'referenced': referenced
-        })
-
-    @property
-    def referenced(self):
-        return self._referenced
-
-    def _status(self):
-        return 'referenced'
 
 
 class MissingTags(Response):
