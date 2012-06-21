@@ -124,8 +124,6 @@ class Scraper(object):
         method = instruction.get('method', 'get')
         if method not in ['head', 'get', 'post']:
             raise InvalidInstruction("Illegal HTTP method: %s" % method)
-        else:
-            requester = getattr(self._session, method)
 
         urlSub = Substitution(instruction['load'], req.tags)
         nameSub = Substitution(instruction.get('name'), req.tags)
@@ -153,6 +151,10 @@ class Scraper(object):
             opts = dict(cookies=cookies, headers=headers)
             if method == 'post' or posts:
                 opts['data'] = posts
+                # Force use of POST if post-data was set.
+                method = 'post'
+
+            requester = getattr(self._session, method)
 
             resp = requester(urlSub.result, **opts)
             if resp.status_code == 200:
@@ -202,13 +204,16 @@ class Scraper(object):
             # We can just copy it over
             elif up_key not in orig:
                 orig[up_key] = extension[up_key]
+            # If they're both dicts, then we update.  If not, then a replace
+            # will happen.
             else:
                 orig_val = orig[up_key]
                 up_val = extension[up_key]
                 if isinstance(orig_val, dict) and isinstance(up_val, dict):
                     orig_val.update(up_val)
+                # Keep things available for total replacement.
                 else:
-                    raise InvalidInstruction("%s must be a dict" % up_key)
+                    continue
 
             # Clear out key for update at end
             extension.pop(up_key)

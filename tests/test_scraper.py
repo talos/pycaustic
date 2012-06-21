@@ -3,6 +3,7 @@
 
 import sys
 import os
+import json
 sys.path.insert(0, os.path.abspath('..'))
 
 from helpers import unittest
@@ -53,6 +54,24 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         resp = Scraper().scrape({'load':'http://www.google.com'})
         self.assertEquals('wait', resp.status)
 
+    def test_force_post(self):
+        """
+        We make a post request if any post-values were defined.
+        """
+        resp = Scraper().scrape({
+            'load': 'http://www.httpbin.org/post',
+            'posts': {
+                'roses': 'red',
+                'violets': 'blue'
+            }
+        }, force=True)
+        self.assertEquals('loaded', resp.status)
+        bin_content = json.loads(resp.results[0].value)
+        self.assertEquals({
+            'roses': 'red',
+            'violets': 'blue'
+        }, bin_content['form'])
+
     def test_object_extends(self):
         """
         We should be able to get a valid scraper using extends.
@@ -76,6 +95,43 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         We should be able to get a valid scraper using an array of extends
         objects.
         """
+        instruction = {
+            "extends": [{
+                "find": r"foo\w+"
+            },{
+                "match": 1
+            }]
+        }
+        resp = Scraper().scrape(instruction, input="foobar foobaz")
+
+        # results should only be the second 'foo'
+        self.assertEquals('found', resp.status)
+        self.assertEquals([{
+            'value': 'foobaz'
+        }], [r.as_dict() for r in resp.results])
+
+    def test_object_extends_update(self):
+        """
+        We should be able to use extends to update certain keys (posts!) in the
+        original.
+        """
+        resp = Scraper().scrape({
+            'load': 'http://httpbin.org/post',
+            'posts': {
+                'roses': 'red'
+            },
+            'extends': {
+                'posts': {
+                    'violets': 'blue'
+                }
+            }
+        }, force=True)
+        self.assertEquals('loaded', resp.status)
+        bin_content = json.loads(resp.results[0].value)
+        self.assertEquals({
+            'roses': 'red',
+            'violets': 'blue'
+        }, bin_content['form'])
 
     def test_simple_google_request(self):
         """
