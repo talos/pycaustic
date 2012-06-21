@@ -160,12 +160,61 @@ class Scraper(object):
                 result = Result(resp.text, Scraper(self._session).scrape(then,
                                                                          req.tags,
                                                                          resp.text))
-                return DoneLoad(req, name, description, result, resp.cookies.get_dict())
+                return DoneLoad(req, name, description, result, resp.cookies)
             else:
                 return Failed(req, "Status code %s from %s" % (
                     resp.status_code, url))
         except requests.exceptions.RequestException as e:
             return Failed(req, str(e))
+
+    def _extend_instruction(self, orig, extension):
+        """
+        Extend one instruction with another.  Orig and extension are modified
+        in-place!
+        """
+        # keys that are turned into arrays & extended
+        for ex_key in ['extends', 'then']:
+            # Nothing to extend, skip out the pop at end
+            if ex_key not in extension:
+                continue
+            # We can just copy it over
+            elif ex_key not in orig:
+                orig[ex_key] = extension[ex_key]
+            else:
+                # Wrap the original value in a list
+                if not isinstance(orig[ex_key], list):
+                    orig[ex_key] = [orig[ex_key]]
+
+                # Use extend if the extension is also a list, append otherwise
+                if isinstance(extension[ex_key], list):
+                    orig[ex_key].extend(extension[ex_key])
+                else:
+                    orig[ex_key].append(extension[ex_key])
+
+            # Clear out key for update at end
+            extension.pop(ex_key)
+
+        # keys that are updated
+        for up_key in ['cookies', 'headers', 'posts']:
+            # Nothing to update, skip out pop at end
+            if up_key not in extension:
+                continue
+            # We can just copy it over
+            elif up_key not in orig:
+                orig[up_key] = extension[up_key]
+            else:
+                orig_val = orig[up_key]
+                up_val = extension[up_key]
+                if isinstance(orig_val, dict) and isinstance(up_val, dict):
+                    orig_val.update(up_val)
+                else:
+                    raise InvalidInstruction("%s must be a dict" % up_key)
+
+            # Clear out key for update at end
+            extension.pop(up_key)
+
+        # everything else is replaced.
+        orig.update(extension)
 
     def _scrape_dict(self, req, instruction):
         """
@@ -173,18 +222,27 @@ class Scraper(object):
 
         :returns: Response
         """
-        then = instruction.pop('then', [])
-        description = instruction.pop('description', None)
+        instruction = copy.deepcopy(instruction)
 
-        # Extend our instruction dict, overwriting keys
         while 'extends' in instruction:
             extends = instruction.pop('extends')
             if isinstance(extends, basestring):
-                instruction.update(self._load_uri(extends))
+                self._extend_instruction(instruction, self._load_uri(extends))
             elif isinstance(extends, dict):
-                instruction.update(extends)
+                self._extend_instruction(instruction, extends)
+            elif isinstance(extends, list):
+                for ex in extends:
+                    if isinstance(ex, basestring):
+                        self._extend_instruction(instruction, self._load_uri(ex))
+                    elif isinstance(ex, dict):
+                        self._extend_instruction(instruction, ex)
+                    else:
+                        raise InvalidInstruction("element of `extends` list must be a dict or str")
             else:
-                raise InvalidInstruction("`extends` must be a dict or str")
+                raise TypeError()
+
+        then = instruction.pop('then', [])
+        description = instruction.pop('description', None)
 
         if 'find' in instruction:
             return self._scrape_find(req, instruction, description, then)

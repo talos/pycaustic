@@ -20,7 +20,6 @@ class Result(object):
                     self._as_dict['children'] = [child.as_dict() for child in children]
                 else:
                     self._children = None
-                    self._as_dict['children'] = None
             elif isinstance(children, Response):
                 self._children = [children]
                 self._as_dict['children'] = [children.as_dict()]

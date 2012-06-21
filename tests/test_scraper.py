@@ -46,13 +46,36 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertEquals('foobar', result.value)
         self.assertIsNone(result.children)
 
-
     def test_needs_force(self):
         """
         Don't load anything without force!
         """
         resp = Scraper().scrape({'load':'http://www.google.com'})
         self.assertEquals('wait', resp.status)
+
+    def test_object_extends(self):
+        """
+        We should be able to get a valid scraper using extends.
+        """
+        instruction = {
+            "extends": {
+                "find": r"foo\w+"
+            },
+            "match": 1
+        }
+        resp = Scraper().scrape(instruction, input="foobar foobaz")
+
+        # results should only be the second 'foo'
+        self.assertEquals('found', resp.status)
+        self.assertEquals([{
+            'value': 'foobaz'
+        }], [r.as_dict() for r in resp.results])
+
+    def test_array_extends(self):
+        """
+        We should be able to get a valid scraper using an array of extends
+        objects.
+        """
 
     def test_simple_google_request(self):
         """
