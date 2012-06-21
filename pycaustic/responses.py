@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+import json
+
 class Result(object):
     """
     The successful result of a single instruction.
@@ -24,6 +26,9 @@ class Result(object):
                 self._as_dict['children'] = [children.as_dict()]
             else:
                 raise TypeError('result children must be response or list')
+
+    def __str__(self):
+        return json.dumps(self.as_dict())
 
     @property
     def value(self):
@@ -52,6 +57,9 @@ class Response(object):
             'uri': self._uri,
             'status': self.status
         }
+
+    def __str__(self):
+        return json.dumps(self.as_dict())
 
     @property
     def id(self):
