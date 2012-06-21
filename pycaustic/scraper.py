@@ -4,12 +4,14 @@ import requests
 import uuid
 import copy
 import os
+import urlparse
+import json
 
 from .patterns import Regex
 from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
                          Failed, Result )
 from .templates import Substitution
-from .errors import InvalidInstruction
+from .errors import InvalidInstructionError, SchemeSecurityError
 
 class Request(object):
 
@@ -52,18 +54,36 @@ class Scraper(object):
         # We defensively deepcopy session -- advisable?
         self._session = copy.deepcopy(session)
 
-    def _load_uri(self, string):
+    def _load_uri(self, base_uri, uri_to_resolve):
         """
         Obtain a remote instruction.
+
+        Returns the instruction as a python object, along with the resolved uri
         """
-        raise NotImplementedError('Remotely constructed instructions not yet supported')
+        resolved_uri = urlparse.urlsplit(urlparse.urljoin(base_uri, uri_to_resolve))
+        base_scheme = urlparse.urlsplit(base_uri).scheme
+        if base_scheme is not None and base_scheme != resolved_uri.scheme:
+            raise SchemeSecurityError("Cannot cross from '%s' to '%s'" % (
+                base_scheme, resolved_uri.scheme))
+
+        try:
+            if resolved_uri.scheme in ['http', 'https']:
+                instruction = json.loads(requests.get(resolved_uri).content)
+            elif resolved_uri.scheme is '':
+                instruction = json.load(open(urlparse.urlunsplit(resolved_uri)))
+            else:
+                raise InvalidInstructionError("Reference to unsupported scheme '%s'" % (
+                    resolved_uri.scheme))
+            return instruction, urlparse.urlunsplit(resolved_uri)
+        except ValueError:
+            raise InvalidInstructionError("Invalid JSON at '%s'" % resolved_uri)
 
     def _scrape_find(self, req, instruction, description, then):
         """
         Scrape a find instruction
         """
         if 'find' not in instruction:
-            raise InvalidInstruction("Missing regex")
+            raise InvalidInstructionError("Missing regex")
 
         findSub = Substitution(instruction['find'], req.tags)
         replaceSub = Substitution(instruction.get('replace', '$0'), req.tags)
@@ -119,11 +139,11 @@ class Scraper(object):
         :returns: DoneLoad, Wait, MissingTags, or Failed
         """
         if 'load' not in instruction:
-            raise InvalidInstruction("Missing URL in `load` key")
+            raise InvalidInstructionError("Missing URL in `load` key")
 
         method = instruction.get('method', 'get')
         if method not in ['head', 'get', 'post']:
-            raise InvalidInstruction("Illegal HTTP method: %s" % method)
+            raise InvalidInstructionError("Illegal HTTP method: %s" % method)
 
         urlSub = Substitution(instruction['load'], req.tags)
         nameSub = Substitution(instruction.get('name'), req.tags)
@@ -232,17 +252,17 @@ class Scraper(object):
         while 'extends' in instruction:
             extends = instruction.pop('extends')
             if isinstance(extends, basestring):
-                self._extend_instruction(instruction, self._load_uri(extends))
+                self._extend_instruction(instruction, self._load_uri(req.uri, extends))
             elif isinstance(extends, dict):
                 self._extend_instruction(instruction, extends)
             elif isinstance(extends, list):
                 for ex in extends:
                     if isinstance(ex, basestring):
-                        self._extend_instruction(instruction, self._load_uri(ex))
+                        self._extend_instruction(instruction, self._load_uri(req.uri, ex))
                     elif isinstance(ex, dict):
                         self._extend_instruction(instruction, ex)
                     else:
-                        raise InvalidInstruction("element of `extends` list must be a dict or str")
+                        raise InvalidInstructionError("element of `extends` list must be a dict or str")
             else:
                 raise TypeError()
 
@@ -254,7 +274,7 @@ class Scraper(object):
         elif 'load' in instruction:
             return self._scrape_load(req, instruction, description, then)
         else:
-            raise InvalidInstruction("Could not find `find` or `load` key.")
+            raise InvalidInstructionError("Could not find `find` or `load` key.")
 
     def scrape(self, instruction, tags={}, input='', force=False, **kwargs):
         """
@@ -274,16 +294,17 @@ class Scraper(object):
         :returns: Response or list of Responses
         """
 
+        uri = kwargs.pop('uri', os.getcwd() + os.path.sep)
+        req_id = kwargs.pop('id', str(uuid.uuid4()))
+
         # Have to track down the instruction.
         while isinstance(instruction, basestring):
             instructionSub = Substitution(instruction, tags)
             if instructionSub.missing_tags:
                 return MissingTags(self, instructionSub.missingTags)
-            instruction = self._load_uri(instructionSub.result)
+            instruction, uri = self._load_uri(uri, instructionSub.result)
 
-        req = Request(instruction, tags, input, force,
-                      kwargs.pop('id', str(uuid.uuid4())),
-                      kwargs.pop('uri', os.getcwd()))
+        req = Request(instruction, tags, input, force, uri, req_id)
 
         # Handle each element of list separately within this context.
         if isinstance(instruction, list):
@@ -300,4 +321,4 @@ class Scraper(object):
 
         # Fail.
         else:
-            raise InvalidInstruction(instruction)
+            raise InvalidInstructionError(instruction)

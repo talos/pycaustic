@@ -7,7 +7,7 @@ class CausticError(StandardError):
     pass
 
 
-class InvalidInstruction(CausticError):
+class InvalidInstructionError(CausticError):
     """
     An error resulting from an invalid instruction.
     """
@@ -35,3 +35,10 @@ class TemplateResultError(TemplateError):
     An error from illegal access to a the result property of a template.
     """
     pass
+
+
+class SchemeSecurityError(CausticError):
+    """
+    An error that is thrown when an unsafe scheme conversion is attempted
+    (any scheme to local).
+    """

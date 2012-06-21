@@ -9,6 +9,8 @@ sys.path.insert(0, os.path.abspath('..'))
 from helpers import unittest
 from pycaustic import Scraper
 
+FILE_PATH = os.path.abspath(__file__)
+
 class TestSetup(object):
 
     def setUp(self):
@@ -46,6 +48,19 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         # It should have the value from regex and no children
         self.assertEquals('foobar', result.value)
         self.assertIsNone(result.children)
+
+    def test_filesystem_json(self):
+        """
+        Test loading in some JSON
+        """
+        instruction = 'fixtures/find-foobar.json'
+        resp = Scraper().scrape(instruction, input="foobar baz boo",
+                                uri= FILE_PATH)
+
+        self.assertEquals('found', resp.status)
+        self.assertEquals({
+            'value': 'foobar'
+        }, resp.results[0].as_dict())
 
     def test_needs_force(self):
         """
