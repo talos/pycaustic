@@ -205,7 +205,7 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         # And which has no children
         self.assertIsNone(result.children)
 
-    def test_then_reference(self):
+    def test_then_reference_string(self):
         """
         Test that the proper URI is maintained for resolving "then"
         """
@@ -216,6 +216,20 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertEquals(resp.status, 'found')
         self.assertEquals('foobar', resp.results[1].value)
         self.assertEquals('foobar', resp.results[1].children[0].results[0].value)
+
+    def test_then_reference_list(self):
+        """
+        Test that the proper URI is maintained for resolving "then" in
+        a list
+        """
+        resp = Scraper().scrape('fixtures/then-links.json',
+                                uri=FILE_PATH,
+                               input="foobaz foobar")
+
+        self.assertEquals(resp.status, 'found')
+        self.assertEquals('foobar', resp.results[1].value)
+        self.assertEquals('foobar', resp.results[1].children[0].results[0].value)
+        self.assertEquals('foobar', resp.results[1].children[1].results[0].value)
 
 
 

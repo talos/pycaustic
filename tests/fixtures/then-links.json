@@ -1,0 +1,4 @@
+{
+    "find": "foo(\\w*)",
+    "then": ["find-foobar.json", "find-foobar.json"]
+}

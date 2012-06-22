@@ -319,10 +319,10 @@ class Scraper(object):
         # Handle each element of list separately within this context.
         if isinstance(instruction, list):
             return map(lambda i: Scraper(self._session).scrape(i,
-                                                               tags,
-                                                               input,
-                                                               force,
-                                                               **kwargs),
+                                                               tags=tags,
+                                                               input=input,
+                                                               force=force,
+                                                               uri=uri),
                       instruction)
 
         # Dict instructions are ones we can actually handle
