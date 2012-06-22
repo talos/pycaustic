@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.abspath('..'))
 
 from helpers import unittest
 from pycaustic import Scraper
+from pycaustic.errors import InvalidInstructionError
 
 FILE_PATH = os.path.abspath(__file__)
 
@@ -231,6 +232,21 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertEquals('foobar', resp.results[1].children[0].results[0].value)
         self.assertEquals('foobar', resp.results[1].children[1].results[0].value)
 
+    def test_nonexistent_file(self):
+        """
+        Test that an InvalidInstructionError is thrown for unknown files.
+        """
+        with self.assertRaises(InvalidInstructionError):
+            Scraper().scrape('/does/not/exist')
+
+    def xtest_security_exception(self):
+        """
+        Test that we get a security exception when going from remote to local
+        URI
+        """
+        # TODO: no "file:" scheme support, don't see any incentive for adding
+        # it
+        pass
 
 
 if __name__ == '__main__':

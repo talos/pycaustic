@@ -75,8 +75,12 @@ class Scraper(object):
                 raise InvalidInstructionError("Reference to unsupported scheme '%s'" % (
                     resolved_uri.scheme))
             return instruction, urlparse.urlunsplit(resolved_uri)
+        except requests.exceptions.RequestException as e:
+            raise InvalidInstructionError("Couldn't load '%s': %s" % (resolved_uri, e))
+        except IOError as e:
+            raise InvalidInstructionError("Couldn't open '%s': %s" % (resolved_uri, e))
         except ValueError:
-            raise InvalidInstructionError("Invalid JSON at '%s'" % resolved_uri)
+            raise InvalidInstructionError("Invalid JSON in '%s'" % resolved_uri)
 
     def _scrape_find(self, req, instruction, description, then):
         """
