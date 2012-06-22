@@ -89,3 +89,34 @@ class TestSubstitution(unittest.TestCase):
         })
 
         self.assertEquals(['flower1', 'color2'], sub.missing_tags)
+
+    def test_url_encoding(self):
+        """
+        By default, we should be encoding stuff in {{}}
+        """
+        tmpl = "{{foo}}"
+        sub = Substitution(tmpl, {
+            'foo': "bar baz"
+        })
+        self.assertEquals("bar+baz", sub.result)
+
+    def test_not_url_encoding(self):
+        """
+        Triple brackets mean that it's not encoded inside.
+        """
+        tmpl = "{{{foo}}}"
+        sub = Substitution(tmpl, {
+            'foo': "bar baz"
+        })
+        self.assertEquals("bar baz", sub.result)
+
+    def test_not_url_encoding_a_url(self):
+        """
+        We really want to make sure we don't touch these in {{{}}}!
+        """
+        tmpl = "{{{url}}}"
+        url = "http://www.host.com/foo/bar/baz%20is%20ok?foo=bar&baz=boo"
+        sub = Substitution(tmpl, {
+            'url': url
+        })
+        self.assertEquals(url, sub.result)
