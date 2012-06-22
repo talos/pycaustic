@@ -123,9 +123,12 @@ class Scraper(object):
         for s in subs:
             fork_tags = copy.deepcopy(req.tags)
             fork_tags[name] = s
-            results.append(Result(s, Scraper(self._session).scrape(then,
-                                                                   fork_tags,
-                                                                   s)))
+            results.append(Result(s,
+                                  Scraper(self._session).scrape(then,
+                                                                tags=fork_tags,
+                                                                input=s,
+                                                                uri=req.uri
+                                                               )))
 
         if len(results):
             return DoneFind(req, name, description, results)
@@ -179,9 +182,12 @@ class Scraper(object):
             resp = requester(urlSub.result, **opts)
             if resp.status_code == 200:
                 # Call children using the response text as input
-                result = Result(resp.text, Scraper(self._session).scrape(then,
-                                                                         req.tags,
-                                                                         resp.text))
+                result = Result(resp.text,
+                                Scraper(self._session).scrape(then,
+                                                              tags=req.tags,
+                                                              input=resp.text,
+                                                              uri=req.uri
+                                                             ))
                 return DoneLoad(req, name, description, result, resp.cookies)
             else:
                 return Failed(req, "Status code %s from %s" % (
@@ -290,6 +296,8 @@ class Scraper(object):
         :type: str
         :param: (optional) force Whether to actually load a load
         :type: bool
+        :param: (optional) uri URI to resolve from
+        :type: str
         :param: (optional) id ID for request
         :type: str
 

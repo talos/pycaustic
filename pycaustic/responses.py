@@ -95,7 +95,7 @@ class Ready(Response):
         self._as_dict.update({
             'name': name,
             'description': description,
-            'results': results
+            'results': [r.as_dict() for r in results]
         })
 
     @property
