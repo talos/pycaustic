@@ -3,7 +3,6 @@
 
 import os
 import sys
-import pycaustic
 
 try:
     from setuptools import setup
@@ -15,11 +14,13 @@ if sys.argv[-1] == 'publish':
     os.system('python setup.py sdist upload')
     sys.exit()
 
+execfile('pycaustic/version.py')
+
 packages = ['pycaustic']
 
 setup(
     name='pycaustic',
-    version=pycaustic.__version__,
+    version=__version__,
     description='Python adaptation of Caustic',
     long_description=open('README.md').read(),
     author='John Krauss',
