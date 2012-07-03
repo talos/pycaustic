@@ -127,7 +127,7 @@ class DoneLoad(Ready):
         super(DoneLoad, self).__init__(request, name, description, [result])
         self._cookies = cookies
         self._as_dict.update({
-            'cookies': cookies
+            'cookies': cookies.get_dict()
         })
 
     @property
