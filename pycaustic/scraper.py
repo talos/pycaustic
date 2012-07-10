@@ -137,7 +137,8 @@ class Scraper(object):
         if len(results):
             return DoneFind(req, name, description, results)
         else:
-            return Failed(req, "No matches")
+            return Failed(req, "No matches for '%s', evaluated to '%s'" % (
+                instruction['find'], findSub.result))
 
     def _scrape_load(self, req, instruction, description, then):
         """
