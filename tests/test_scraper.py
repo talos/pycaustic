@@ -50,11 +50,6 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertEquals('foobar', result.value)
         self.assertIsNone(result.children)
 
-        # It should have a single entry in the value_dict
-        self.assertEquals({
-            'foobar': 'foobar'
-        }, resp.value_dict)
-
     def test_filesystem_json(self):
         """
         Test loading in some JSON
@@ -257,11 +252,9 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertEquals('russian dolls', resp.results[0].children[0].results[0].value)
         self.assertEquals('dolls', resp.results[0].children[0].results[0].children[0].results[0].value)
 
-    def test_value_dict_one_to_one(self):
+    def test_flattened_values_all_one_to_one(self):
         """
-        The results of a find should be easily accessible through value dicts.
-
-        In this case, there is nothing hidden (all 1-to-1).
+        Flattened values
         """
         resp = Scraper().scrape({
             "find": "^.*$",
@@ -279,13 +272,11 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             'everything': 'red blue',
             'roses': 'red',
             'violets': 'blue'
-        }, resp.value_dict)
+        }, resp.flattened_values)
 
-    def test_value_dict_one_to_many(self):
+    def test_flattened_values_with_one_to_many(self):
         """
-        The results of a find should be easily accessible through value dicts.
-
-        In this case, violets are hidden (not one-to-one).
+        Flattened values
         """
         resp = Scraper().scrape({
             "find": "^.*$",
@@ -302,7 +293,9 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertEquals({
             'everything': 'red blue blue',
             'roses': 'red',
-        }, resp.value_dict)
+            'violets': [{'violets': 'blue' },
+                        {'violets': 'blue' } ]
+        }, resp.flattened_values)
 
     def xtest_security_exception(self):
         """

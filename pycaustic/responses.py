@@ -111,24 +111,33 @@ class Ready(Response):
         return self._results
 
     @property
-    def value_dict(self):
+    def flattened_values(self):
         """
-        Obtain a dict containing all 1-to-1 results, descending as deeply
-        as possible.
+        Obtain a dict or list containing all results, descending as deeply
+        as possible. One-to-one relations are flattened.
         """
-        value_dict = {}
 
-        # Only descend if there was just one result
-        if len(self.results) == 1:
-            result = self.results[0]
-            value_dict[self.name] = result.value
-
-            if result.children:
-                for c in result.children:
+        flattened_values = []
+        for r in self.results:
+            branch = {
+                self.name: r.value
+            }
+            if r.children:
+                for c in r.children:
                     if isinstance(c, Ready):
-                        value_dict.update(c.value_dict)
+                        child_flat_values = c.flattened_values
 
-        return value_dict
+                        if isinstance(child_flat_values, dict):
+                            branch.update(child_flat_values)
+                        else:
+                            branch[c.name] = child_flat_values
+
+            flattened_values.append(branch)
+
+        if len(flattened_values) == 1:
+            return flattened_values[0]
+        else:
+            return flattened_values
 
 class DoneFind(Ready):
     """
