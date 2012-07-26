@@ -162,7 +162,7 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             'violets': 'blue'
         }, bin_content['form'])
 
-    def test_simple_google_request(self):
+    def xtest_simple_google_request(self):
         """
         Test a very straightforward request to Google to look for "I'm feeling
         lucky".
@@ -238,6 +238,20 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         """
         with self.assertRaises(InvalidInstructionError):
             Scraper().scrape('/does/not/exist')
+
+    def test_nested_files(self):
+        """
+        Each URI should be resolved relative to the current URL.
+        """
+        resp = Scraper().scrape('fixtures/nested.json',
+                                uri=FILE_PATH,
+                               input="there are some russian dolls")
+
+        self.assertEquals(resp.status, 'found')
+        self.assertEquals('some russian dolls', resp.results[0].value)
+        self.assertEquals('russian dolls', resp.results[0].children[0].results[0].value)
+        self.assertEquals('dolls', resp.results[0].children[0].results[0].children[0].results[0].value)
+
 
     def xtest_security_exception(self):
         """

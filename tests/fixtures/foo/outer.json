@@ -1,0 +1,4 @@
+{
+    "find": "russian dolls",
+    "then": "bar/inner.json"
+}
