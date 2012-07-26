@@ -50,6 +50,11 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertEquals('foobar', result.value)
         self.assertIsNone(result.children)
 
+        # It should have a single entry in the value_dict
+        self.assertEquals({
+            'foobar': 'foobar'
+        }, resp.value_dict)
+
     def test_filesystem_json(self):
         """
         Test loading in some JSON
@@ -252,6 +257,52 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         self.assertEquals('russian dolls', resp.results[0].children[0].results[0].value)
         self.assertEquals('dolls', resp.results[0].children[0].results[0].children[0].results[0].value)
 
+    def test_value_dict_one_to_one(self):
+        """
+        The results of a find should be easily accessible through value dicts.
+
+        In this case, there is nothing hidden (all 1-to-1).
+        """
+        resp = Scraper().scrape({
+            "find": "^.*$",
+            "name": "everything",
+            "match": 0,
+            "then": [{
+                'name': 'roses',
+                'find': 'red'
+            }, {
+                'name': 'violets',
+                'find': 'blue'
+            }]
+        }, input='red blue')
+        self.assertEquals({
+            'everything': 'red blue',
+            'roses': 'red',
+            'violets': 'blue'
+        }, resp.value_dict)
+
+    def test_value_dict_one_to_many(self):
+        """
+        The results of a find should be easily accessible through value dicts.
+
+        In this case, violets are hidden (not one-to-one).
+        """
+        resp = Scraper().scrape({
+            "find": "^.*$",
+            "name": "everything",
+            "match": 0,
+            "then": [{
+                'name': 'roses',
+                'find': 'red'
+            }, {
+                'name': 'violets',
+                'find': 'blue'
+            }]
+        }, input='red blue blue')
+        self.assertEquals({
+            'everything': 'red blue blue',
+            'roses': 'red',
+        }, resp.value_dict)
 
     def xtest_security_exception(self):
         """

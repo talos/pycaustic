@@ -50,9 +50,10 @@ class Request(object):
 
 class Scraper(object):
 
-    def __init__(self, session=requests.Session()):
+    def __init__(self, session=requests.Session(), force_all=False):
         # We defensively deepcopy session -- advisable?
         self._session = copy.deepcopy(session)
+        self._force_all = force_all
 
     def _load_uri(self, base_uri, uri_to_resolve):
         """
@@ -298,7 +299,8 @@ class Scraper(object):
         :type: dict
         :param: (optional) input Input for Find
         :type: str
-        :param: (optional) force Whether to actually load a load
+        :param: (optional) force Whether to actually load a load.  Overriden
+                by force_all at init-time
         :type: bool
         :param: (optional) uri URI to resolve from
         :type: str
@@ -310,6 +312,10 @@ class Scraper(object):
 
         uri = kwargs.pop('uri', os.getcwd() + os.path.sep)
         req_id = kwargs.pop('id', str(uuid.uuid4()))
+
+        # Override force with force_all
+        if self._force_all is True:
+            force = True
 
         # Have to track down the instruction.
         while isinstance(instruction, basestring):

@@ -110,6 +110,25 @@ class Ready(Response):
     def results(self):
         return self._results
 
+    @property
+    def value_dict(self):
+        """
+        Obtain a dict containing all 1-to-1 results, descending as deeply
+        as possible.
+        """
+        value_dict = {}
+
+        # Only descend if there was just one result
+        if len(self.results) == 1:
+            result = self.results[0]
+            value_dict[self.name] = result.value
+
+            if result.children:
+                for c in result.children:
+                    if isinstance(c, Ready):
+                        value_dict.update(c.value_dict)
+
+        return value_dict
 
 class DoneFind(Ready):
     """
