@@ -297,6 +297,41 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
                         {'violets': 'blue' } ]
         }, resp.flattened_values)
 
+    def test_nested_flattened_values(self):
+        """
+        Flattened values
+        """
+        self.maxDiff = None
+        resp = Scraper().scrape({
+            "find": "^.*$",
+            "name": "everything",
+            "match": 0,
+            "then": {
+                'name': 'sentences',
+                'find': r'\s?([^.]+)\.',
+                'replace': '$1',
+                'then': [{
+                    'name': 'first word',
+                    'find': r'^\w+'
+                }, {
+                    'name': 'last word',
+                    'find': r'\w+$'
+                }]
+            }
+        }, input='roses are red. violets are blue.')
+        self.assertEquals({
+            'everything': 'roses are red. violets are blue.',
+            'sentences': [{
+                'sentences': 'roses are red',
+                'first word': "roses",
+                'last word': 'red'
+            }, {
+                'sentences': 'violets are blue',
+                'first word': 'violets',
+                'last word': 'blue'
+            }]
+        }, resp.flattened_values)
+
     def xtest_security_exception(self):
         """
         Test that we get a security exception when going from remote to local
