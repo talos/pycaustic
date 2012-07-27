@@ -129,7 +129,7 @@ class Scraper(object):
             fork_tags = copy.deepcopy(req.tags)
             fork_tags[name] = s
             results.append(Result(s,
-                                  Scraper(self._session).scrape(then,
+                                  Scraper(session=self._session, force_all=self._force_all).scrape(then,
                                                                 tags=fork_tags,
                                                                 input=s,
                                                                 uri=req.uri
@@ -189,7 +189,7 @@ class Scraper(object):
             if resp.status_code == 200:
                 # Call children using the response text as input
                 result = Result(resp.text,
-                                Scraper(self._session).scrape(then,
+                                Scraper(session=self._session, force_all=self._force_all).scrape(then,
                                                               tags=req.tags,
                                                               input=resp.text,
                                                               uri=req.uri
@@ -329,7 +329,7 @@ class Scraper(object):
 
         # Handle each element of list separately within this context.
         if isinstance(instruction, list):
-            return map(lambda i: Scraper(self._session).scrape(i,
+            return map(lambda i: Scraper(session=self._session, force_all=self._force_all).scrape(i,
                                                                tags=tags,
                                                                input=input,
                                                                force=force,
