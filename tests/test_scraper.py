@@ -301,7 +301,6 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         """
         Flattened values
         """
-        self.maxDiff = None
         resp = Scraper().scrape({
             "find": "^.*$",
             "name": "everything",
@@ -330,6 +329,24 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
                 'first word': 'violets',
                 'last word': 'blue'
             }]
+        }, resp.flattened_values)
+
+    def test_flattened_overwrite(self):
+        """
+        Should prefer deeply-nested values
+        """
+        resp = Scraper().scrape({
+            "find": "^.*$",
+            "name": "roses",
+            "match": 0,
+            "then": {
+                "name": "roses",
+                "find": "^.*$",
+                "replace": "$0 foobar"
+            }
+        }, input='red')
+        self.assertEquals({
+            'roses': 'red foobar'
         }, resp.flattened_values)
 
     def xtest_security_exception(self):
