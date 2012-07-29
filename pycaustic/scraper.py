@@ -11,7 +11,7 @@ from .patterns import Regex
 from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
                          Failed, Result )
 from .templates import Substitution
-from .errors import InvalidInstructionError, SchemeSecurityError
+from .errors import InvalidInstructionError, SchemeSecurityError, PatternError
 
 class Request(object):
 
@@ -120,7 +120,11 @@ class Scraper(object):
         regex = Regex(findSub.result, ignore_case, multiline, dot_matches_all, replace)
 
         # Negative max means we can't utilize the generator, sadly...
-        subs = [s for s in regex.substitutions(req.input)][min_match:max_match]
+        try:
+            subs = [s for s in regex.substitutions(req.input)][min_match:max_match]
+        except PatternError as e:
+            return Failed(req, "'%s' failed because of %s" % (instruction['find'],
+                                                              str(e)))
 
         results = []
         # Call children once for each substitution, using it as input

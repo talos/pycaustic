@@ -17,8 +17,8 @@ class InvalidInstructionError(CausticError):
 class PatternError(CausticError):
     """
     Class to absorb errors from re.  This provides some flexibility in case
-    we want bad dynamic substitutions (ie {{foo}} -> $1 when there's no
-    first parenthetical group) from blowing things up.  Currently not used.
+    we want bad to prevent dynamic substitutions (ie {{foo}} -> $1 when
+    there's no first parenthetical group) from blowing things up.
     """
     pass
 

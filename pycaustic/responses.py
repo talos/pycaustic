@@ -37,8 +37,14 @@ class Result(object):
     def children(self):
         return self._children
 
-    def as_dict(self):
-        return self._as_dict
+    def as_dict(self, truncated=True):
+        if truncated == True and len(self._as_dict['value']) > 200:
+            val = self._as_dict['value']
+            as_dict = dict(self._as_dict)
+            as_dict['value'] = val[:100] + '...' + val[-100:]
+            return as_dict
+        else:
+            return self._as_dict
 
 
 class Response(object):
@@ -79,7 +85,7 @@ class Response(object):
     def _status(self):
         raise NotImplementedError("Must use subclass")
 
-    def as_dict(self):
+    def as_dict(self, truncated=True):
         return self._as_dict
 
 
