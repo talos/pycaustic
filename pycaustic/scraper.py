@@ -130,6 +130,11 @@ class Scraper(object):
         # Call children once for each substitution, using it as input
         # and with a modified set of tags.
         for s in subs:
+
+            # actually modify our available tags if it was 1-to-1
+            if len(subs) == 1:
+                req.tags[name] = s
+
             fork_tags = copy.deepcopy(req.tags)
             fork_tags[name] = s
             results.append(Result(s,

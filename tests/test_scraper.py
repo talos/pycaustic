@@ -349,6 +349,52 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             'roses': 'red foobar'
         }, resp.flattened_values)
 
+    def test_sibling_accessibility(self):
+        """
+        One-to-one sibling tags should be accessible.
+        """
+        resp = Scraper().scrape({
+            "find": r'\w+ \w+ \w+',
+            "name": "three words",
+            "then": [{
+                "find": r'\w+',
+                "match": 0,
+                "name": "first"
+            }, {
+                "find": r'\w+',
+                "match": 1,
+                "name": "second"
+            }, {
+                "find": r'\w+',
+                "match": 2,
+                "name": "third"
+            }, {
+                "find": ".*",
+                "name": "backwards",
+                "match": 0,
+                "replace": "{{third}} {{second}} {{first}}"
+            }]
+        }, input='the quick brown fox jumped over the lazy dog')
+        self.assertEquals([{
+            'three words': 'the quick brown',
+            'first': 'the',
+            'second': 'quick',
+            'third': 'brown',
+            'backwards': 'brown quick the'
+        }, {
+            'three words': 'fox jumped over',
+            'first': 'fox',
+            'second': 'jumped',
+            'third': 'over',
+            'backwards': 'over jumped fox'
+        }, {
+            'three words': 'the lazy dog',
+            'first': 'the',
+            'second': 'lazy',
+            'third': 'dog',
+            'backwards': 'dog lazy the'
+        }], resp.flattened_values)
+
     def xtest_security_exception(self):
         """
         Test that we get a security exception when going from remote to local
