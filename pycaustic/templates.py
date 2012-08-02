@@ -44,8 +44,8 @@ class Substitution(object):
 
     def _replace_tag(self, match, encode):
         tag_name = match.group(1)
-        val = self._tags.get(tag_name)
-        if val:
+        if self._tags.has_key(tag_name):
+            val = self._tags.get(tag_name)
             return val if not encode else urllib.quote_plus(val, safe='')
         else:
             self._missing_tags.append(tag_name)

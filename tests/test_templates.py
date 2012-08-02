@@ -120,3 +120,13 @@ class TestSubstitution(unittest.TestCase):
             'url': url
         })
         self.assertEquals(url, sub.result)
+
+    def test_substituting_blank(self):
+        """
+        We should be able to substitute in a blank string
+        """
+        tmpl = "nothing inside '{{blank}}'"
+        sub = Substitution(tmpl, {
+            'blank': ''
+        })
+        self.assertEquals("nothing inside ''", sub.result)
