@@ -106,6 +106,10 @@ class Ready(Response):
 
     @property
     def name(self):
+        """
+        The name specified in the instruction for this Response.  Is None if
+        no name was specified.
+        """
         return self._name
 
     @property
@@ -125,9 +129,12 @@ class Ready(Response):
 
         flattened_values = []
         for r in self.results:
-            branch = {
-                self.name: r.value
-            }
+            branch = {}
+
+            # Only set a value when a name was specified.
+            if self.name is not None:
+                branch[self.name] = r.value
+
             if r.children:
                 for c in r.children:
                     if isinstance(c, Ready):
@@ -135,7 +142,7 @@ class Ready(Response):
 
                         if isinstance(child_flat_values, dict):
                             branch.update(child_flat_values)
-                        else:
+                        elif c.name is not None:
                             branch[c.name] = child_flat_values
 
             flattened_values.append(branch)

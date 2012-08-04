@@ -114,7 +114,7 @@ class Scraper(object):
             return MissingTags(req, missing_tags)
 
         # Default to regex as string
-        name = nameSub.result if nameSub.result else findSub.result
+        name = nameSub.result if nameSub.result else None
         replace = replaceSub.result
 
         regex = Regex(findSub.result, ignore_case, multiline, dot_matches_all, replace)
@@ -176,7 +176,7 @@ class Scraper(object):
             return MissingTags(req, missing_tags)
 
         url = urlSub.result
-        name = nameSub.result if nameSub.result else url
+        name = nameSub.result if nameSub.result else None
 
         if req.force != True:
             return Wait(req, name, description)
