@@ -109,7 +109,18 @@ class Scraper(object):
         # Python counts a little differently
         max_match = None if max_match == -1 else max_match + 1
 
-        missing_tags = Substitution.add_missing(findSub, replaceSub, nameSub)
+        substitutions = [findSub, replaceSub, nameSub]
+
+        # Parameterize input if it was supplied
+        if 'input' in instruction:
+            inputSub = Substitution(instruction['input'], req.tags)
+            substitutions.append(inputSub)
+            if not len(inputSub.missing_tags):
+                input = inputSub.result
+        else:
+            input = req.input
+
+        missing_tags = Substitution.add_missing(*substitutions)
         if len(missing_tags):
             return MissingTags(req, missing_tags)
 
@@ -121,7 +132,7 @@ class Scraper(object):
 
         # Negative max means we can't utilize the generator, sadly...
         try:
-            subs = [s for s in regex.substitutions(req.input)][min_match:max_match]
+            subs = [s for s in regex.substitutions(input)][min_match:max_match]
         except PatternError as e:
             return Failed(req, "'%s' failed because of %s" % (instruction['find'],
                                                               str(e)))

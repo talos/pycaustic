@@ -395,6 +395,34 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             'backwards': 'dog lazy the'
         }], resp.flattened_values)
 
+    def test_input_instruction(self):
+        """
+        Possible to specify input in instruction.
+        """
+        resp = Scraper().scrape({
+            "find": r'(roses|violets)',
+            "name": "flower",
+            "input": "roses are red"
+        }, input="violets are blue")
+        self.assertEquals({
+            "flower": "roses"
+        }, resp.flattened_values)
+
+    def test_input_instruction_template(self):
+        """
+        Possible to parameterize input instruction.
+        """
+        resp = Scraper().scrape({
+            "find": r'(roses|violets)',
+            "name": "flower",
+            "input": "{{flowers}} are red"
+        }, input="violets are blue", tags = {
+            "flowers": "roses"
+        })
+        self.assertEquals({
+            "flower": "roses"
+        }, resp.flattened_values)
+
     def xtest_security_exception(self):
         """
         Test that we get a security exception when going from remote to local
