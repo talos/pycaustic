@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import requests
+import grequests
 import uuid
 import copy
 import os
@@ -205,23 +206,27 @@ class Scraper(object):
         headers = headersSub.result
 
         try:
-            opts = dict(cookies=cookies, headers=headers)
+            opts = dict(cookies=cookies,
+                        headers=headers,
+                        session=self._session)
             if method == 'post' or posts:
                 opts['data'] = posts
                 # Force use of POST if post-data was set.
                 method = 'post'
 
-            requester = getattr(self._session, method)
+            requester = getattr(grequests, method)
 
-            resp = requester(urlSub.result, **opts)
+            greq = requester(urlSub.result, **opts)
+            greq.send()
+            resp = greq.response
             if resp.status_code == 200:
                 # Call children using the response text as input
-                result = Result(resp.text,
-                                Scraper(session=self._session, force_all=self._force_all).scrape(then,
-                                                              tags=req.tags,
-                                                              input=resp.text,
-                                                              uri=req.uri
-                                                             ))
+                child_scraper = Scraper(session=self._session, force_all=self._force_all)
+                scraper_results = child_scraper.scrape(then,
+                                                       tags=req.tags,
+                                                       input=resp.text,
+                                                       uri=req.uri)
+                result = Result(resp.text, scraper_results)
                 return DoneLoad(req, name, description, result, resp.cookies)
             else:
                 return Failed(req, "Status code %s from %s" % (
