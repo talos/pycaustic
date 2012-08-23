@@ -6,6 +6,7 @@ import copy
 import os
 import urlparse
 import json
+import gevent
 
 from .patterns import Regex
 from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
@@ -349,12 +350,16 @@ class Scraper(object):
 
         # Handle each element of list separately within this context.
         if isinstance(instruction, list):
-            return map(lambda i: Scraper(session=self._session, force_all=self._force_all).scrape(i,
-                                                               tags=tags,
-                                                               input=input,
-                                                               force=force,
-                                                               uri=uri),
-                      instruction)
+            greenlets = map(lambda i: Scraper(session=self._session,
+                                              force_all=self._force_all
+                                             ).scrape_async(i,
+                                                            tags=tags,
+                                                            input=input,
+                                                            force=force,
+                                                            uri=uri),
+                            instruction)
+            gevent.joinall(greenlets)
+            return [g.get() for g in greenlets]
 
         # Dict instructions are ones we can actually handle
         elif isinstance(instruction, dict):
@@ -363,3 +368,10 @@ class Scraper(object):
         # Fail.
         else:
             raise InvalidInstructionError(instruction)
+
+    def scrape_async(self, instruction, tags={}, input='', force=False, **kwargs):
+        """
+        Scrape a request like `scrape`, except returns a greenlet which
+        supplies the Response or list of Responses from `get`.
+        """
+        return gevent.spawn(self.scrape, instruction, tags, input, force=False, **kwargs)
