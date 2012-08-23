@@ -138,7 +138,11 @@ class Scraper(object):
             return Failed(req, "'%s' failed because of %s" % (instruction['find'],
                                                               str(e)))
 
-        results = []
+        if len(subs) == 0:
+            return Failed(req, "No matches for '%s', evaluated to '%s'" % (
+                instruction['find'], findSub.result))
+
+        greenlets = []
         # Call children once for each substitution, using it as input
         # and with a modified set of tags.
         for s in subs:
@@ -149,18 +153,21 @@ class Scraper(object):
 
             fork_tags = copy.deepcopy(req.tags)
             fork_tags[name] = s
-            results.append(Result(s,
-                                  Scraper(session=self._session, force_all=self._force_all).scrape(then,
-                                                                tags=fork_tags,
-                                                                input=s,
-                                                                uri=req.uri
-                                                               )))
+            child_scraper = Scraper(session=self._session, force_all=self._force_all)
 
-        if len(results):
-            return DoneFind(req, name, description, results)
-        else:
-            return Failed(req, "No matches for '%s', evaluated to '%s'" % (
-                instruction['find'], findSub.result))
+            greenlets.append(child_scraper.scrape_async(then,
+                                                        tags=fork_tags,
+                                                        input=s,
+                                                        uri=req.uri))
+
+        gevent.joinall(greenlets)
+
+        # Build Results with responses from greenlets
+        results = []
+        for i, s in enumerate(subs):
+            results.append(Result(s, greenlets[i].get()))
+
+        return DoneFind(req, name, description, results)
 
     def _scrape_load(self, req, instruction, description, then):
         """
