@@ -149,11 +149,14 @@ class Scraper(object):
         for s in subs:
 
             # actually modify our available tags if it was 1-to-1
-            if len(subs) == 1:
+            if len(subs) == 1 and name is not None:
                 req.tags[name] = s
 
             fork_tags = copy.deepcopy(req.tags)
-            fork_tags[name] = s
+
+            if name is not None:
+                fork_tags[name] = s
+
             child_scraper = Scraper(session=self._session, force_all=self._force_all)
 
             greenlets.append(child_scraper.scrape_async(then,

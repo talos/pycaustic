@@ -57,10 +57,9 @@ class Response(object):
         self._uri = request.uri
         self._instruction = request.instruction
         self._as_dict = {
-            'id': self._id,
-            'instruction': self._instruction,
             'uri': self._uri,
-            'status': self.status
+            'status': self.status,
+            'tags': request.tags
         }
 
     def __str__(self):
