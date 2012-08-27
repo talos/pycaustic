@@ -76,31 +76,6 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             'value': 'foobar'
         }, resp.results[0].as_dict())
 
-    def test_needs_force(self):
-        """
-        Don't load anything without force!
-        """
-        resp = Scraper().scrape({'load':'http://www.google.com'})
-        self.assertEquals('wait', resp.status)
-
-    def test_force_post(self):
-        """
-        We make a post request if any post-values were defined.
-        """
-        resp = Scraper().scrape({
-            'load': 'http://www.httpbin.org/post',
-            'posts': {
-                'roses': 'red',
-                'violets': 'blue'
-            }
-        }, force=True)
-        self.assertEquals('loaded', resp.status)
-        bin_content = json.loads(resp.results[0].value)
-        self.assertEquals({
-            'roses': 'red',
-            'violets': 'blue'
-        }, bin_content['form'])
-
     def test_object_extends(self):
         """
         We should be able to get a valid scraper using extends.
