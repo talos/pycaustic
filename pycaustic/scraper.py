@@ -130,10 +130,9 @@ class Scraper(object):
         name = nameSub.result if nameSub.result else None
         replace = replaceSub.result
 
-        regex = Regex(findSub.result, ignore_case, multiline, dot_matches_all, replace)
-
-        # Negative max means we can't utilize the generator, sadly...
         try:
+            regex = Regex(findSub.result, ignore_case, multiline, dot_matches_all, replace)
+            # Negative max means we can't utilize the generator, sadly...
             subs = [s for s in regex.substitutions(input)][min_match:max_match]
         except PatternError as e:
             return Failed(req, "'%s' failed because of %s" % (instruction['find'],

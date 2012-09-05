@@ -100,6 +100,13 @@ class TestRegex(unittest.TestCase):
         subs = [sub for sub in r.substitutions('the quick brown')]
         self.assertEquals(['theFOOhe', 'quickFOOuick', 'brownFOOrown'], subs)
 
+    def test_unbalanced(self):
+        """
+        We should catch unbalanced parentheses.
+        """
+        with self.assertRaises(PatternError):
+            r = Regex(r'(', False, False, False, '$0')
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -40,7 +40,11 @@ class Regex(object):
         re_flags += re.MULTILINE if multiline else 0
         re_flags += re.DOTALL if dot_matches_all else 0
 
-        self.regex = re.compile(regex_str, re_flags)
+        try:
+            self.regex = re.compile(regex_str, re_flags)
+        except re.error as e:
+            raise PatternError(e)
+
         self.replace = _switch_backreferences(replace)
 
     def substitutions(self, input):
