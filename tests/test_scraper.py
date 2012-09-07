@@ -398,6 +398,21 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "flower": "roses"
         }, resp.flattened_values)
 
+    def test_match_substitution(self):
+        """
+        Should be possible to use templates in match.
+        """
+        resp = Scraper().scrape({
+            "find": r'\w+',
+            "name": "president",
+            "match": "{{which}}"
+        }, input="washington adams jefferson", tags = {
+            "which": "2"
+        })
+        self.assertEquals({
+            "president": "jefferson"
+        }, resp.flattened_values)
+
     def xtest_security_exception(self):
         """
         Test that we get a security exception when going from remote to local

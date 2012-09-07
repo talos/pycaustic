@@ -105,8 +105,8 @@ class Scraper(object):
         match_raw = instruction.get('match', None)
 
         # Use single match if it was defined
-        min_match_sub = Substitution(min_match_raw if match_raw is None else match_raw)
-        max_match_sub = Substitution(max_match_raw if match_raw is None else match_raw)
+        min_match_sub = Substitution(min_match_raw if match_raw is None else match_raw, req.tags)
+        max_match_sub = Substitution(max_match_raw if match_raw is None else match_raw, req.tags)
 
         substitutions = [find_sub, replace_sub, name_sub, min_match_sub, max_match_sub]
         # Parameterize input if it was supplied
