@@ -447,6 +447,52 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "flower": "petunias"
         }, resp.flattened_values)
 
+    def test_capture_match_numbers_replace(self):
+        """
+        Should be possible to capture the number of a match in the replace string.
+        """
+        resp = Scraper().scrape({
+            "find": r'\w+',
+            "name": "president",
+            "tag_match": "which",
+            "replace": "$0 was {{which}}"
+        }, input="washington adams jefferson")
+        self.assertEquals([{
+            "president": "washington was 0"
+        }, {
+            "president": "adams was 1"
+        }, {
+            "president": "jefferson was 2"
+        }], resp.flattened_values)
+
+    def test_capture_match_numbers_in_tags(self):
+        """
+        Children should have access to the tag_match, too.
+        """
+        resp = Scraper().scrape({
+            "find": r'\w+',
+            "tag_match": "which",
+            "name": "president",
+            "then": {
+                "find": r'\w+',
+                "name": "sentence",
+                "input": "first second third",
+                "match": "{{which}}",
+                "replace": "{{{president}}} was $0"
+            }
+        }, input="washington adams jefferson")
+        self.assertEquals([{
+            "president": "washington",
+            "sentence": "washington was first"
+        }, {
+            "president": "adams",
+            "sentence": "adams was second"
+        }, {
+            "president": "jefferson",
+            "sentence": "jefferson was third"
+        }], resp.flattened_values)
+
+
     def xtest_security_exception(self):
         """
         Test that we get a security exception when going from remote to local
