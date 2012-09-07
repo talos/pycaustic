@@ -432,6 +432,21 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "president": "jefferson"
         }], resp.flattened_values)
 
+    def test_tags_in_instruction(self):
+        """
+        Should be possible to place tags directly in instruction.
+        """
+        resp = Scraper().scrape({
+            "find": r'{{{flower}}}',
+            "name": "flower",
+            "tags": {
+                "flower": "petunias"
+            }
+        }, input="violets roses petunias")
+        self.assertEquals({
+            "flower": "petunias"
+        }, resp.flattened_values)
+
     def xtest_security_exception(self):
         """
         Test that we get a security exception when going from remote to local

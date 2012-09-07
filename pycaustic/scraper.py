@@ -321,6 +321,11 @@ class Scraper(object):
             else:
                 raise TypeError()
 
+        # Imperfect solution, but updating tags in request directly
+        # should be safe at this point.
+        tags = instruction.pop('tags', {})
+        req._tags.update(tags)
+
         then = instruction.pop('then', [])
         description = instruction.pop('description', None)
 
