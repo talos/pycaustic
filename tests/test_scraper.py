@@ -492,6 +492,40 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "sentence": "jefferson was third"
         }], resp.flattened_values)
 
+    def test_replace_tag(self):
+        """
+        Should be able to place arbitrary tags in replace.
+        """
+        resp = Scraper().scrape({
+            "find": r'\w+',
+            "name": "flower",
+            "replace": "$0 are {{{adjective}}}",
+            "tags": {
+                "adjective": "beautiful"
+            }
+        }, input="roses")
+        self.assertEquals({
+            "flower": "roses are beautiful"
+        }, resp.flattened_values)
+
+    def test_replace_self(self):
+        """
+        Should be able to modify a tag in-place.
+        """
+        resp = Scraper().scrape({
+            "find": r'\w+',
+            "name": "flower",
+            "then": [{
+                "find": "^",
+                "name": "flower",
+                "replace": "{{{flower}}} forever"
+            }]
+        }, input="roses violets")
+        self.assertEquals([{
+            "flower": "roses forever"
+        }, {
+            "flower": "violets forever"
+        }], resp.flattened_values)
 
     def xtest_security_exception(self):
         """

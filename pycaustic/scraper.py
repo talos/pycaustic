@@ -154,40 +154,41 @@ class Scraper(object):
                 instruction['find'], find_sub.result))
 
         greenlets = []
-        fork_tags = []
+        replaced_subs = []
         # Call children once for each substitution, using it as input
         # and with a modified set of tags.
         for i, s_unsubbed in enumerate(subs):
 
+            fork_tags = copy.deepcopy(req.tags)
+
+            # Ensure we can use tag_match in children
+            if tag_match:
+                fork_tags[tag_match] = str(i)
+
+            # Fail out if unable to replace.
+            s_sub = Substitution(s_unsubbed, fork_tags)
+            if s_sub.missing_tags:
+                return MissingTags(req, s_sub.missing_tags)
+            else:
+                s_subbed = s_sub.result
+                replaced_subs.append(s_subbed)
+
             # actually modify our available tags if it was 1-to-1
             if len(subs) == 1 and name is not None:
-                req.tags[name] = s_unsubbed
+                req.tags[name] = s_subbed
 
                 # The tag_match name is chosen in instruction, so it's OK
                 # to propagate it -- no pollution risk
                 if tag_match:
                     req.tags[tag_match] = str(i)
 
-            fork_tags.append(copy.deepcopy(req.tags))
-
-            # Ensure we can use tag_match in children
-            if tag_match:
-                fork_tags[i][tag_match] = str(i)
-
-            # Fail out if unable to replace.
-            s_sub = Substitution(s_unsubbed, fork_tags[i])
-            if s_sub.missing_tags:
-                return MissingTags(req, s_sub.missing_tags)
-            else:
-                s_subbed = s_sub.result
-
             if name is not None:
-                fork_tags[i][name] = s_subbed
+                fork_tags[name] = s_subbed
 
             child_scraper = Scraper(session=self._session, force_all=self._force_all)
 
             greenlets.append(child_scraper.scrape_async(then,
-                                                        tags=fork_tags[i],
+                                                        tags=fork_tags,
                                                         input=s_subbed,
                                                         uri=req.uri))
 
@@ -199,13 +200,7 @@ class Scraper(object):
         for i, s_unsubbed in enumerate(subs):
             child_resps = greenlets[i].get()
 
-            s_sub = Substitution(s_unsubbed, fork_tags[i])
-            if s_sub.missing_tags:
-                return MissingTags(req, s_sub.missing_tags)
-            else:
-                s_subbed = s_sub.result
-
-            results.append(Result(s_subbed, child_resps))
+            results.append(Result(replaced_subs[i], child_resps))
 
         return DoneFind(req, name, description, results)
 
