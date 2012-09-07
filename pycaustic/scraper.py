@@ -92,33 +92,29 @@ class Scraper(object):
         if 'find' not in instruction:
             raise InvalidInstructionError("Missing regex")
 
-        findSub = Substitution(instruction['find'], req.tags)
-        replaceSub = Substitution(instruction.get('replace', '$0'), req.tags)
-        nameSub = Substitution(instruction.get('name'), req.tags)
+        find_sub = Substitution(instruction['find'], req.tags)
+        replace_sub = Substitution(instruction.get('replace', '$0'), req.tags)
+        name_sub = Substitution(instruction.get('name'), req.tags)
         ignore_case = instruction.get('case_insensitive', False)
         multiline = instruction.get('multiline', False)
         dot_matches_all = instruction.get('dot_matches_all', True)
 
         # Default to full range
-        min_match = instruction.get('min_match', 0)
-        max_match = instruction.get('max_match', -1)
-        match = instruction.get('match', None)
+        min_match_raw = instruction.get('min_match', 0)
+        max_match_raw = instruction.get('max_match', -1)
+        match_raw = instruction.get('match', None)
 
         # Use single match if it was defined
-        min_match = min_match if match is None else match
-        max_match = max_match if match is None else match
+        min_match_sub = Substitution(min_match_raw if match_raw is None else match_raw)
+        max_match_sub = Substitution(max_match_raw if match_raw is None else match_raw)
 
-        # Python counts a little differently
-        max_match = None if max_match == -1 else max_match + 1
-
-        substitutions = [findSub, replaceSub, nameSub]
-
+        substitutions = [find_sub, replace_sub, name_sub, min_match_sub, max_match_sub]
         # Parameterize input if it was supplied
         if 'input' in instruction:
-            inputSub = Substitution(instruction['input'], req.tags)
-            substitutions.append(inputSub)
-            if not len(inputSub.missing_tags):
-                input = inputSub.result
+            input_sub = Substitution(instruction['input'], req.tags)
+            substitutions.append(input_sub)
+            if not len(input_sub.missing_tags):
+                input = input_sub.result
         else:
             input = req.input
 
@@ -126,12 +122,22 @@ class Scraper(object):
         if len(missing_tags):
             return MissingTags(req, missing_tags)
 
+        try:
+            min_match = int(min_match_sub.result)
+            max_match = int(max_match_sub.result)
+        except ValueError:
+            return Failed("Min_match '%s' or max_match '%s' is not an int" % (
+                min_match.result, max_match.result))
+
+        # Python counts a little differently
+        max_match = None if max_match == -1 else max_match + 1
+
         # Default to regex as string
-        name = nameSub.result if nameSub.result else None
-        replace = replaceSub.result
+        name = name_sub.result if name_sub.result else None
+        replace = replace_sub.result
 
         try:
-            regex = Regex(findSub.result, ignore_case, multiline, dot_matches_all, replace)
+            regex = Regex(find_sub.result, ignore_case, multiline, dot_matches_all, replace)
             # Negative max means we can't utilize the generator, sadly...
             subs = [s for s in regex.substitutions(input)][min_match:max_match]
         except PatternError as e:
@@ -140,7 +146,7 @@ class Scraper(object):
 
         if len(subs) == 0:
             return Failed(req, "No matches for '%s', evaluated to '%s'" % (
-                instruction['find'], findSub.result))
+                instruction['find'], find_sub.result))
 
         greenlets = []
         # Call children once for each substitution, using it as input

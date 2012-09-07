@@ -17,6 +17,22 @@ class TestSubstitution(unittest.TestCase):
         self.assertEquals([], sub.missing_tags)
         self.assertEquals('roses are red', sub.result)
 
+    def test_float_replace(self):
+        """
+        Floats should be coerced to strings.
+        """
+        sub = Substitution(4.5, {})
+
+        self.assertEqual('4.5', sub.result)
+
+    def test_int_replace(self):
+        """
+        Ints should be coerced to strings.
+        """
+        sub = Substitution(-100, {})
+
+        self.assertEqual('-100', sub.result)
+
     def test_several_replacements(self):
         """
         Test replacing several strings.

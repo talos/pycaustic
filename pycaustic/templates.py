@@ -2,6 +2,7 @@
 
 import re
 import urllib
+import numbers
 from .errors import TemplateError, TemplateResultError
 
 class Substitution(object):
@@ -23,12 +24,14 @@ class Substitution(object):
         # Simple string, sub out components
         elif isinstance(template, basestring):
             self._result = self._sub(template)
-
         # Substitution on dict, sub out each key and value
         elif isinstance(template, dict):
             self._result = {}
             for k, v in template.iteritems():
                 self._result[self._sub(k)] = self._sub(v)
+        # Substituion on number, convert to str
+        elif isinstance(template, numbers.Number):
+            self._result = self._sub(unicode(template))
         else:
             raise TemplateError("Substitutions can only be made on strings and dicts")
 
