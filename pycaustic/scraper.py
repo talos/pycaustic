@@ -52,9 +52,12 @@ class Request(object):
 
 class Scraper(object):
 
-    def __init__(self, session=requests.Session(), force_all=False):
-        # We defensively deepcopy session -- advisable?
-        self._session = copy.deepcopy(session)
+    def __init__(self, session=None, force_all=False):
+        if session is None:
+            self._session = requests.Session()
+        else:
+            # We defensively deepcopy session -- advisable?
+            self._session = copy.deepcopy(session)
         self._force_all = force_all
 
     def _load_uri(self, base_uri, uri_to_resolve):
