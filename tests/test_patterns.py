@@ -105,8 +105,39 @@ class TestRegex(unittest.TestCase):
         We should catch unbalanced parentheses.
         """
         with self.assertRaises(PatternError):
-            r = Regex(r'(', False, False, False, '$0')
+            Regex(r'(', False, False, False, '$0')
 
+    def test_range(self):
+        """
+        Should get the whole range by default.
+        """
+        r = Regex(r'\w+', False, False, False, '$0')
+        subs = [sub for sub in r.substitutions('the quick brown fox')]
+        self.assertEquals(['the', 'quick', 'brown', 'fox'], subs)
+
+    def test_beginning(self):
+        """
+        Support for explicit beginning range.
+        """
+        r = Regex(r'\w+', False, False, False, '$0')
+        subs = [sub for sub in r.substitutions('the quick brown fox', 0, 2)]
+        self.assertEquals(['the', 'quick'], subs)
+
+    def test_middle_slice(self):
+        """
+        Support for explicit middle slice.
+        """
+        r = Regex(r'\w+', False, False, False, '$0')
+        subs = [sub for sub in r.substitutions('the quick brown fox', 1, 3)]
+        self.assertEquals(['quick', 'brown'], subs)
+
+    def test_middle_single(self):
+        """
+        Support for explicit single word in middle.
+        """
+        r = Regex(r'\w+', False, False, False, '$0')
+        subs = [sub for sub in r.substitutions('the quick brown fox', 2, 3)]
+        self.assertEquals(['brown'], subs)
 
 if __name__ == '__main__':
     unittest.main()
