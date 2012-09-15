@@ -27,7 +27,7 @@ class Result(object):
                 raise TypeError('result children must be response or list')
 
     def __str__(self):
-        return json.dumps(self.as_dict())
+        return json.dumps(self.as_dict(), default=lambda x: "Unencodable (%s)" % x)
 
     @property
     def value(self):
@@ -63,7 +63,7 @@ class Response(object):
         }
 
     def __str__(self):
-        return json.dumps(self.as_dict())
+        return json.dumps(self.as_dict(), default=lambda x: "Unencodable (%s)" % x)
 
     @property
     def id(self):

@@ -8,12 +8,16 @@ import os
 import urlparse
 import json
 import gevent
+import collections
 
 from .patterns import Regex
 from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
                          Failed, Result )
 from .templates import Substitution
 from .errors import InvalidInstructionError, SchemeSecurityError, PatternError
+
+FILE_CACHE = collections.OrderedDict()
+MAX_FILE_CACHE = 1
 
 class Request(object):
 
@@ -76,7 +80,20 @@ class Scraper(object):
             if resolved_uri.scheme in ['http', 'https']:
                 instruction = json.loads(requests.get(resolved_uri).text)
             elif resolved_uri.scheme is '':
-                instruction = json.load(open(urlparse.urlunsplit(resolved_uri)))
+                resolved_uri_str = urlparse.urlunsplit(resolved_uri)
+                # Use our file cache if we can
+                instruction = FILE_CACHE.get(resolved_uri_str)
+
+                # Otherwise, load and save in the cache
+                if instruction is None:
+
+                    # Keep the cache a sane size
+                    if len(FILE_CACHE) > MAX_FILE_CACHE:
+                        FILE_CACHE.popitem(last=False)
+
+                    instruction = json.load(open(resolved_uri_str))
+                    FILE_CACHE[resolved_uri_str] = instruction
+
             else:
                 raise InvalidInstructionError("Reference to unsupported scheme '%s'" % (
                     resolved_uri.scheme))
