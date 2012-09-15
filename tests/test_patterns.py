@@ -7,33 +7,35 @@ from pycaustic.errors import PatternError
 
 
 class TestSwitchBackrefrences(unittest.TestCase):
+    # These tests are all disabled when using re2, since substitutions no
+    # longer can be done on $0 (which was the major sticking point)
 
-    def test_no_bs(self):
+    def xtest_no_bs(self):
         """
         Appropriate name.  Should do nothing.
         """
         self.assertEquals('foobar', _switch_backreferences('foobar'))
 
-    def test_escapes(self):
+    def xtest_escapes(self):
         """
         We should be able to escape $ when followed by numbers
         """
         self.assertEquals('$100', _switch_backreferences(r'\$100'))
 
-    def test_not_escapes(self):
+    def xtest_not_escapes(self):
         """
         We should not escape $ when it's followed by something else
         """
         self.assertEquals(r'\$foo', _switch_backreferences(r'\$foo'))
 
-    def test_backslash_alone(self):
+    def xtest_backslash_alone(self):
         """
         Should insert a properly numbered backslash in place of single $
         backreference
         """
         self.assertEquals(r'\g<0>', _switch_backreferences(r'$0'))
 
-    def test_backslash_in_string(self):
+    def xtest_backslash_in_string(self):
         """
         Should insert a properly numbered backslash in place of $ reference
         in midst of string
@@ -41,7 +43,7 @@ class TestSwitchBackrefrences(unittest.TestCase):
         self.assertEquals(r'foo\g<0>bar',
                           _switch_backreferences(r'foo$0bar'))
 
-    def test_backslashes_alone(self):
+    def xtest_backslashes_alone(self):
         """
         Should insert a properly numbered backslashes in place of $
         backreferences
@@ -49,7 +51,7 @@ class TestSwitchBackrefrences(unittest.TestCase):
         self.assertEquals(r'\g<0>\g<2>\g<100>',
                           _switch_backreferences(r'$0$2$100'))
 
-    def test_backslashes_in_string(self):
+    def xtest_backslashes_in_string(self):
         """
         Should insert a properly numbered backslashes in place of $
         backreferences
@@ -92,13 +94,23 @@ class TestRegex(unittest.TestCase):
         with self.assertRaises(PatternError):
             r.substitutions('foo').next()
 
-    def test_several_substitutions(self):
+    # Disabled because $0 is not supported as an expansion with re2.
+    def xtest_several_substitutions_0_1(self):
         """
-        Test a few substitutions
+        Test a few substitutions, with $0
         """
         r = Regex(r'\w(\w+)', False, False, False, '$0FOO$1')
         subs = [sub for sub in r.substitutions('the quick brown')]
         self.assertEquals(['theFOOhe', 'quickFOOuick', 'brownFOOrown'], subs)
+
+    # Alternative to test above
+    def test_several_substitutions_1_2(self):
+        """
+        Test a few substitutions, without $0
+        """
+        r = Regex(r'(\w)(\w+)', False, False, False, '$1FOO$2')
+        subs = [sub for sub in r.substitutions('the quick brown')]
+        self.assertEquals(['tFOOhe', 'qFOOuick', 'bFOOrown'], subs)
 
     def test_unbalanced(self):
         """

@@ -1,27 +1,29 @@
 # -*- coding: utf-8 -*-
 
 from .errors import PatternError
-import re
+import re2 as re
 
-# Pattern/replacement to turn all unescaped $ followed by
-# numbers into backslashes
-DOLLAR_PATTERN = re.compile(r'(?<!\\)\$(?=\d+)')
-DOLLAR_REPL = r'\\'
-
-# Pattern/replacement to turn all \ followed by numbers into
-# format \g<d> (useful because Python recognizes \g<0> but not \0
-BS_PATTERN = re.compile(r'\\(\d+)')
-BS_REPL = r'\\g<\1>'
-
-# Pattern/replacement to turn escaped $ back into $
-UNDOLLAR_PATTERN = re.compile(r'\\\$(?=\d+)')
-UNDOLLAR_REPL = r'$'
+#  # Pattern/replacement to turn all unescaped $ followed by
+#  # numbers into backslashes
+#  DOLLAR_PATTERN = re.compile(r'(?<!\\)\$(?=\d+)')
+#  DOLLAR_REPL = r'\\'
+#  
+#  # Pattern/replacement to turn all \ followed by numbers into
+#  # format \g<d> (useful because Python recognizes \g<0> but not \0
+#  BS_PATTERN = re.compile(r'\\(\d+)')
+#  BS_REPL = r'\\g<\1>'
+#  
+#  # Pattern/replacement to turn escaped $ back into $
+#  UNDOLLAR_PATTERN = re.compile(r'\\\$(?=\d+)')
+#  UNDOLLAR_REPL = r'$'
+#  
+#  def _switch_backreferences(input):
+#      return UNDOLLAR_PATTERN.sub(UNDOLLAR_REPL,
+#              BS_PATTERN.sub(BS_REPL,
+#               DOLLAR_PATTERN.sub(DOLLAR_REPL, input)))
 
 def _switch_backreferences(input):
-    return UNDOLLAR_PATTERN.sub(UNDOLLAR_REPL,
-            BS_PATTERN.sub(BS_REPL,
-             DOLLAR_PATTERN.sub(DOLLAR_REPL, input)))
-
+    return input.replace('$', '\\')
 
 class Regex(object):
     """
@@ -31,7 +33,6 @@ class Regex(object):
 
     This also lets us get lists of strings directly via substitutions.
     """
-
 
     def __init__(self, regex_str, ignore_case, multiline, dot_matches_all, replace):
 
@@ -45,6 +46,18 @@ class Regex(object):
         except re.error as e:
             raise PatternError(e)
 
+        # re2 raises different errors
+        except Exception as e:
+            raise PatternError(e)
+
+        # Don't bother with template expansion on these
+        self._notemplate = replace == '$0'
+
+        # TEMP: re2 doesn't support template expansion on $0.  Why would you
+        # want to, anyway?
+        if not self._notemplate and replace.find('$0') > -1:
+            raise PatternError("$0 is not supported in template expansion")
+
         self.replace = _switch_backreferences(replace)
 
     def substitutions(self, input, min_match=0, max_match=None):
@@ -52,12 +65,20 @@ class Regex(object):
         Obtain an iterator over replacements from the input via the regex.
         """
         for i, match in enumerate(self.regex.finditer(input)):
+
             if i < min_match:
                 continue
             elif max_match != None and i >= max_match:
                 break
 
             try:
-                yield match.expand(self.replace)
+                if self._notemplate:
+                    yield match.string[match.start():match.end()]
+                else:
+                    yield match.expand(self.replace)
             except re.error as e:
+                raise PatternError(e)
+
+            # re2 raises different errors
+            except Exception as e:
                 raise PatternError(e)

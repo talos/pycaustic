@@ -316,8 +316,8 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "match": 0,
             "then": {
                 "name": "roses",
-                "find": "^.*$",
-                "replace": "$0 foobar"
+                "find": "^(.*)$",
+                "replace": "$1 foobar"
             }
         }, input='red')
         self.assertEquals({
@@ -452,10 +452,10 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         Should be possible to capture the number of a match in the replace string.
         """
         resp = Scraper().scrape({
-            "find": r'\w+',
+            "find": r'(\w+)',
             "name": "president",
             "tag_match": "which",
-            "replace": "$0 was {{which}}"
+            "replace": "$1 was {{which}}"
         }, input="washington adams jefferson")
         self.assertEquals([{
             "president": "washington was 0"
@@ -474,11 +474,11 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "tag_match": "which",
             "name": "president",
             "then": {
-                "find": r'\w+',
+                "find": r'(\w+)',
                 "name": "sentence",
                 "input": "first second third",
                 "match": "{{which}}",
-                "replace": "{{{president}}} was $0"
+                "replace": "{{{president}}} was $1"
             }
         }, input="washington adams jefferson")
         self.assertEquals([{
@@ -497,9 +497,9 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         Should be able to place arbitrary tags in replace.
         """
         resp = Scraper().scrape({
-            "find": r'\w+',
+            "find": r'(\w+)',
             "name": "flower",
-            "replace": "$0 are {{{adjective}}}",
+            "replace": "$1 are {{{adjective}}}",
             "tags": {
                 "adjective": "beautiful"
             }
