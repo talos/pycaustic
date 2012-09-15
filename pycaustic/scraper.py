@@ -152,6 +152,7 @@ class Scraper(object):
                 min_match.result, max_match.result))
 
         # Python counts a little differently
+        single_match = min_match == max_match
         max_match = None if max_match == -1 else max_match + 1
 
         # Default to regex as string
@@ -163,64 +164,70 @@ class Scraper(object):
         try:
             regex = Regex(find_sub.result, ignore_case, multiline, dot_matches_all,
                           replace_unsubbed)
-            # Negative max means we can't utilize the generator, sadly...
-            subs = [s for s in regex.substitutions(input)][min_match:max_match]
+
+            # This lets through max_match = None, which is OK for generator
+            if min_match > -1 and max_match > -1:
+                subs = regex.substitutions(input, min_match, max_match)
+            # Negative values mean we can't utilize the generator, sadly...
+            else:
+                subs = [s for s in regex.substitutions(input)][min_match:max_match]
+
+            greenlets = []
+            replaced_subs = []
+            # Call children once for each substitution, using it as input
+            # and with a modified set of tags.
+            for i, s_unsubbed in enumerate(subs):
+
+                fork_tags = copy.deepcopy(req.tags)
+
+                # Ensure we can use tag_match in children
+                if tag_match:
+                    fork_tags[tag_match] = str(i)
+
+                # Fail out if unable to replace.
+                s_sub = Substitution(s_unsubbed, fork_tags)
+                if s_sub.missing_tags:
+                    return MissingTags(req, s_sub.missing_tags)
+                else:
+                    s_subbed = s_sub.result
+                    replaced_subs.append(s_subbed)
+
+                # actually modify our available tags if it was 1-to-1
+                if single_match and name is not None:
+                    req.tags[name] = s_subbed
+
+                    # The tag_match name is chosen in instruction, so it's OK
+                    # to propagate it -- no pollution risk
+                    if tag_match:
+                        req.tags[tag_match] = str(i)
+
+                if name is not None:
+                    fork_tags[name] = s_subbed
+
+                child_scraper = Scraper(session=self._session, force_all=self._force_all)
+
+                greenlets.append(child_scraper.scrape_async(then,
+                                                            tags=fork_tags,
+                                                            input=s_subbed,
+                                                            uri=req.uri))
         except PatternError as e:
             return Failed(req, "'%s' failed because of %s" % (instruction['find'],
                                                               str(e)))
 
-        if len(subs) == 0:
+        if len(greenlets) == 0:
             return Failed(req, "No matches for '%s', evaluated to '%s'" % (
                 instruction['find'], find_sub.result))
-
-        greenlets = []
-        replaced_subs = []
-        # Call children once for each substitution, using it as input
-        # and with a modified set of tags.
-        for i, s_unsubbed in enumerate(subs):
-
-            fork_tags = copy.deepcopy(req.tags)
-
-            # Ensure we can use tag_match in children
-            if tag_match:
-                fork_tags[tag_match] = str(i)
-
-            # Fail out if unable to replace.
-            s_sub = Substitution(s_unsubbed, fork_tags)
-            if s_sub.missing_tags:
-                return MissingTags(req, s_sub.missing_tags)
-            else:
-                s_subbed = s_sub.result
-                replaced_subs.append(s_subbed)
-
-            # actually modify our available tags if it was 1-to-1
-            if len(subs) == 1 and name is not None:
-                req.tags[name] = s_subbed
-
-                # The tag_match name is chosen in instruction, so it's OK
-                # to propagate it -- no pollution risk
-                if tag_match:
-                    req.tags[tag_match] = str(i)
-
-            if name is not None:
-                fork_tags[name] = s_subbed
-
-            child_scraper = Scraper(session=self._session, force_all=self._force_all)
-
-            greenlets.append(child_scraper.scrape_async(then,
-                                                        tags=fork_tags,
-                                                        input=s_subbed,
-                                                        uri=req.uri))
 
         gevent.joinall(greenlets)
 
         # Build Results with responses from greenlets, substitute in tags
         # (since replace was unsubbed)
         results = []
-        for i, s_unsubbed in enumerate(subs):
+        #for i, s_unsubbed in enumerate(subs):
+        for i, replaced_sub in enumerate(replaced_subs):
             child_resps = greenlets[i].get()
 
-            results.append(Result(replaced_subs[i], child_resps))
+            results.append(Result(replaced_sub, child_resps))
 
         return DoneFind(req, name, description, results)
 

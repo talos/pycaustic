@@ -47,11 +47,16 @@ class Regex(object):
 
         self.replace = _switch_backreferences(replace)
 
-    def substitutions(self, input):
+    def substitutions(self, input, min_match=0, max_match=None):
         """
         Obtain an iterator over replacements from the input via the regex.
         """
-        for match in self.regex.finditer(input):
+        for i, match in enumerate(self.regex.finditer(input)):
+            if i < min_match:
+                continue
+            elif max_match != None and i >= max_match:
+                break
+
             try:
                 yield match.expand(self.replace)
             except re.error as e:
