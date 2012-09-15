@@ -7,40 +7,41 @@ from pycaustic.errors import PatternError
 
 
 class TestSwitchBackrefrences(unittest.TestCase):
+
     # These tests are all disabled when using re2, since substitutions no
     # longer can be done on $0 (which was the major sticking point)
 
-    def xtest_no_bs(self):
+    def test_no_bs(self):
         """
         Appropriate name.  Should do nothing.
         """
         self.assertEquals('foobar', _switch_backreferences('foobar'))
 
-    def xtest_escapes(self):
+    def test_escapes(self):
         """
         We should be able to escape $ when followed by numbers
         """
         self.assertEquals('$100', _switch_backreferences(r'\$100'))
 
-    def xtest_not_escapes(self):
+    def test_not_escapes(self):
         """
         We should not escape $ when it's followed by something else
         """
         self.assertEquals(r'\$foo', _switch_backreferences(r'\$foo'))
 
-    def xtest_backslash_alone(self):
+    def test_backslash_alone(self):
         """
         Should insert a properly numbered backslash in place of single $
         backreference
         """
-        self.assertEquals(r'\g<0>', _switch_backreferences(r'$0'))
+        self.assertEquals(r'\0', _switch_backreferences(r'$0'))
 
-    def xtest_backslash_in_string(self):
+    def test_backslash_in_string(self):
         """
         Should insert a properly numbered backslash in place of $ reference
         in midst of string
         """
-        self.assertEquals(r'foo\g<0>bar',
+        self.assertEquals(r'foo\0bar',
                           _switch_backreferences(r'foo$0bar'))
 
     def xtest_backslashes_alone(self):
@@ -48,7 +49,7 @@ class TestSwitchBackrefrences(unittest.TestCase):
         Should insert a properly numbered backslashes in place of $
         backreferences
         """
-        self.assertEquals(r'\g<0>\g<2>\g<100>',
+        self.assertEquals(r'\0\2\100',
                           _switch_backreferences(r'$0$2$100'))
 
     def xtest_backslashes_in_string(self):
@@ -56,7 +57,7 @@ class TestSwitchBackrefrences(unittest.TestCase):
         Should insert a properly numbered backslashes in place of $
         backreferences
         """
-        self.assertEquals(r'foo\g<0>bar\g<2>baz\g<100>boo',
+        self.assertEquals(r'foo\0bar\2baz\g100boo',
                           _switch_backreferences(r'foo$0bar$2baz$100boo'))
 
 

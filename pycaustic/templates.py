@@ -23,7 +23,10 @@ class Substitution(object):
             self._result = None
         # Simple string, sub out components
         elif isinstance(template, basestring):
-            self._result = self._sub(template)
+            try:
+                self._result = self._sub(str(template))
+            except UnicodeError:
+                raise TypeError("Template %s must be a bytestring" % template)
         # Substitution on dict, sub out each key and value
         elif isinstance(template, dict):
             self._result = {}
@@ -31,7 +34,7 @@ class Substitution(object):
                 self._result[self._sub(k)] = self._sub(v)
         # Substitution on number, convert to str
         elif isinstance(template, numbers.Number):
-            self._result = self._sub(unicode(template))
+            self._result = self._sub(str(template))
         else:
             raise TemplateError("Substitutions can only be made on strings and dicts")
 

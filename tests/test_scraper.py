@@ -527,6 +527,42 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "flower": "violets forever"
         }], resp.flattened_values)
 
+    def test_ascii_in(self):
+        """
+        ASCII string in, ascii string out.
+        """
+        resp = Scraper().scrape({
+            "find": r'\w+',
+            "name": "flowers"
+        }, input="roses violets")
+        self.assertIsInstance(resp.flattened_values[0]['flowers'], str)
+
+    def test_utf_8_in(self):
+        """
+        UTF-8 bytestring in, UTF-8 bytestring out.  Should match words
+        characters as expected.
+        """
+        resp = Scraper().scrape({
+            "find": r'\w+',
+            "name": "first name",
+            "match": 0
+        }, input='jos\xc3\xa9 alejandro')
+        self.assertEquals({
+            "first name": 'jos\xc3\xa9'
+        }, resp.flattened_values)
+
+    def test_no_unicode_in(self):
+        """
+        Matching on unicode is slow.  Please use bytestrings already encoded
+        in UTF-8.
+        """
+        with self.assertRaises(TypeError):
+            Scraper().scrape({
+                "find": r'\w+',
+                "name": "first name",
+                "match": 0
+            }, input=u'jos\xe9 alejandro')
+
     def xtest_security_exception(self):
         """
         Test that we get a security exception when going from remote to local

@@ -19,6 +19,13 @@ from .errors import InvalidInstructionError, SchemeSecurityError, PatternError
 class Request(object):
 
     def __init__(self, instruction, tags, input, force, request_id, uri):
+        try:
+            input = str(input)
+        except UnicodeError:
+            raise TypeError("For performance reasons, only bytestrings may be "
+                            "read as input.  Please encode as UTF-8 to match on "
+                            "extended characters.\n\nOffending string: %s" % input)
+
         self._instruction = copy.deepcopy(instruction)
         self._tags = tags
         self._input = input
@@ -206,8 +213,7 @@ class Scraper(object):
                                                             input=s_subbed,
                                                             uri=req.uri))
         except PatternError as e:
-            return Failed(req, "'%s' failed because of %s" % (instruction['find'],
-                                                              str(e)))
+            return Failed(req, "'%s' failed because of %s" % (instruction['find'], e))
 
         if len(greenlets) == 0:
             return Failed(req, "No matches for '%s', evaluated to '%s'" % (
@@ -272,12 +278,20 @@ class Scraper(object):
             greq = requester(urlSub.result, **opts)
             greq.send()
             resp = greq.response
+
+            # Make sure we're using UTF-8
+            if resp.encoding and resp.encoding.lower() == 'utf-8':
+                resp_content = resp.content
+            else:
+                resp_content = resp.text.encode('utf-8', 'ignore')
+
             if resp.status_code == 200:
                 # Call children using the response text as input
                 child_scraper = Scraper(session=self._session, force_all=self._force_all)
+
                 scraper_results = child_scraper.scrape(then,
                                                        tags=req.tags,
-                                                       input=resp.text,
+                                                       input=resp_content,
                                                        uri=req.uri)
                 result = Result(resp.text, scraper_results)
                 return DoneLoad(req, name, description, result, resp.cookies)
@@ -285,7 +299,7 @@ class Scraper(object):
                 return Failed(req, "Status code %s from %s" % (
                     resp.status_code, url))
         except requests.exceptions.RequestException as e:
-            return Failed(req, str(e))
+            return Failed(req, "%s" % e)
 
     def _extend_instruction(self, orig, extension):
         """
@@ -401,7 +415,6 @@ class Scraper(object):
 
         :returns: Response or list of Responses
         """
-
         uri = kwargs.pop('uri', os.getcwd() + os.path.sep)
         req_id = kwargs.pop('id', str(uuid.uuid4()))
 
