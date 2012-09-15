@@ -8,6 +8,7 @@ import os
 import urlparse
 import json
 import gevent
+from gevent.pool import Pool
 
 from .patterns import Regex
 from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
@@ -52,10 +53,9 @@ class Request(object):
 
 class Scraper(object):
 
-    def __init__(self, session=None, force_all=False):
-        #MAX_FILE_CACHE = 1
-        #FILE_CACHE = collections.OrderedDict()
+    def __init__(self, session=None, force_all=False, concurrency=5):
         self._file_cache = dict()
+        self._pool = Pool(concurrency)
 
         if session is None:
             self._session = requests.Session()
@@ -153,7 +153,6 @@ class Scraper(object):
 
         # Default to regex as string
         name = name_sub.result if name_sub.result else None
-        #replace = replace_sub.result
 
         tag_match = tag_match_sub.result
 
@@ -217,12 +216,9 @@ class Scraper(object):
         gevent.joinall(greenlets)
 
         # Build Results with responses from greenlets, substitute in tags
-        # (since replace was unsubbed)
         results = []
-        #for i, s_unsubbed in enumerate(subs):
         for i, replaced_sub in enumerate(replaced_subs):
             child_resps = greenlets[i].get()
-
             results.append(Result(replaced_sub, child_resps))
 
         return DoneFind(req, name, description, results)
@@ -448,4 +444,4 @@ class Scraper(object):
         Scrape a request like `scrape`, except returns a greenlet which
         supplies the Response or list of Responses from `get`.
         """
-        return gevent.spawn(self.scrape, instruction, tags, input, force=False, **kwargs)
+        return self._pool.spawn(self.scrape, instruction, tags, input, force=False, **kwargs)
