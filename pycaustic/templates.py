@@ -29,7 +29,7 @@ class Substitution(object):
             self._result = {}
             for k, v in template.iteritems():
                 self._result[self._sub(k)] = self._sub(v)
-        # Substituion on number, convert to str
+        # Substitution on number, convert to str
         elif isinstance(template, numbers.Number):
             self._result = self._sub(unicode(template))
         else:
