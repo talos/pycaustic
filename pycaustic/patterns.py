@@ -1,7 +1,11 @@
 # -*- coding: utf-8 -*-
 
 from .errors import PatternError
-import re2 as re
+try:
+    import re2 as re
+    assert re # quiet pyflakes!
+except ImportError:
+    import re
 
 # Pattern/replacement to turn all unescaped $ followed by
 # numbers into backslashes
