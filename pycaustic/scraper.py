@@ -118,11 +118,11 @@ class Scraper(object):
         if 'find' not in instruction:
             raise InvalidInstructionError("Missing regex")
 
-        find_sub = Substitution(instruction['find'], req.tags)
-        #replace_sub = Substitution(instruction.get('replace', '$0'), req.tags)
+        tags = req.tags
+        find_sub = Substitution(instruction['find'], tags)
         replace_unsubbed = instruction.get('replace', '$0')
-        name_sub = Substitution(instruction.get('name'), req.tags)
-        tag_match_sub = Substitution(instruction.get('tag_match'), req.tags)
+        name_sub = Substitution(instruction.get('name'), tags)
+        tag_match_sub = Substitution(instruction.get('tag_match'), tags)
         ignore_case = instruction.get('case_insensitive', False)
         multiline = instruction.get('multiline', False)
         dot_matches_all = instruction.get('dot_matches_all', True)
@@ -133,13 +133,13 @@ class Scraper(object):
         match_raw = instruction.get('match', None)
 
         # Use single match if it was defined
-        min_match_sub = Substitution(min_match_raw if match_raw is None else match_raw, req.tags)
-        max_match_sub = Substitution(max_match_raw if match_raw is None else match_raw, req.tags)
+        min_match_sub = Substitution(min_match_raw if match_raw is None else match_raw, tags)
+        max_match_sub = Substitution(max_match_raw if match_raw is None else match_raw, tags)
 
         substitutions = [find_sub, name_sub, min_match_sub, max_match_sub, tag_match_sub]
         # Parameterize input if it was supplied
         if 'input' in instruction:
-            input_sub = Substitution(instruction['input'], req.tags)
+            input_sub = Substitution(instruction['input'], tags)
             substitutions.append(input_sub)
             if not len(input_sub.missing_tags):
                 input = input_sub.result
@@ -165,6 +165,7 @@ class Scraper(object):
         name = name_sub.result if name_sub.result else None
 
         tag_match = tag_match_sub.result
+        tags = req.tags
 
         try:
             regex = Regex(find_sub.result, ignore_case, multiline, dot_matches_all,
@@ -183,7 +184,7 @@ class Scraper(object):
             # and with a modified set of tags.
             for i, s_unsubbed in enumerate(subs):
 
-                fork_tags = InheritedDict(req.tags)
+                fork_tags = InheritedDict(tags)
 
                 # Ensure we can use tag_match in children
                 if tag_match:
@@ -199,22 +200,25 @@ class Scraper(object):
 
                 # actually modify our available tags if it was 1-to-1
                 if single_match and name is not None:
-                    req.tags[name] = s_subbed
+                    tags[name] = s_subbed
 
                     # The tag_match name is chosen in instruction, so it's OK
                     # to propagate it -- no pollution risk
                     if tag_match:
-                        req.tags[tag_match] = str(i)
+                        tags[tag_match] = str(i)
 
                 if name is not None:
                     fork_tags[name] = s_subbed
 
-                child_scraper = Scraper(session=self._session, force_all=self._force_all)
-
-                greenlets.append(child_scraper.scrape_async(then,
-                                                            tags=fork_tags,
-                                                            input=s_subbed,
-                                                            uri=req.uri))
+                if then:
+                    child_scraper = Scraper(session=self._session, force_all=self._force_all)
+                    greenlets.append(child_scraper.scrape_async(then,
+                                                                id=req.id,
+                                                                tags=fork_tags,
+                                                                input=s_subbed,
+                                                                uri=req.uri))
+                else:
+                    greenlets.append(None)
         except PatternError as e:
             return Failed(req, "'%s' failed because of %s" % (instruction['find'], e))
 
@@ -222,12 +226,16 @@ class Scraper(object):
             return Failed(req, "No matches for '%s', evaluated to '%s'" % (
                 instruction['find'], find_sub.result))
 
-        gevent.joinall(greenlets)
+        #gevent.joinall(greenlets)
 
         # Build Results with responses from greenlets, substitute in tags
         results = []
         for i, replaced_sub in enumerate(replaced_subs):
-            child_resps = greenlets[i].get()
+            g = greenlets[i]
+            if g == None:
+                child_resps = []
+            else:
+                child_resps = g.get()
             results.append(Result(replaced_sub, child_resps))
 
         return DoneFind(req, name, description, results)
@@ -245,11 +253,12 @@ class Scraper(object):
         if method not in ['head', 'get', 'post']:
             raise InvalidInstructionError("Illegal HTTP method: %s" % method)
 
-        urlSub = Substitution(instruction['load'], req.tags)
-        nameSub = Substitution(instruction.get('name'), req.tags)
-        postsSub = Substitution(instruction.get('posts'), req.tags)
-        cookiesSub = Substitution(instruction.get('cookies', {}), req.tags)
-        headersSub = Substitution(instruction.get('headers', {}), req.tags)
+        tags = req.tags
+        urlSub = Substitution(instruction['load'], tags)
+        nameSub = Substitution(instruction.get('name'), tags)
+        postsSub = Substitution(instruction.get('posts'), tags)
+        cookiesSub = Substitution(instruction.get('cookies', {}), tags)
+        headersSub = Substitution(instruction.get('headers', {}), tags)
 
         # Extract our missing tags, if any
         missing_tags = Substitution.add_missing(urlSub, nameSub, postsSub,
@@ -293,7 +302,8 @@ class Scraper(object):
                 child_scraper = Scraper(session=self._session, force_all=self._force_all)
 
                 scraper_results = child_scraper.scrape(then,
-                                                       tags=req.tags,
+                                                       id=req.id,
+                                                       tags=tags,
                                                        input=resp_content,
                                                        uri=req.uri)
                 result = Result(resp.text, scraper_results)
@@ -418,7 +428,8 @@ class Scraper(object):
         :returns: Response or list of Responses
         """
         uri = kwargs.pop('uri', CURDIR + os.path.sep)
-        req_id = kwargs.pop('id', str(uuid.uuid4()))
+        #req_id = kwargs.pop('id', str(uuid.uuid4()))
+        req_id = kwargs.pop('id', None)
 
         # Override force with force_all
         if self._force_all is True:
@@ -438,6 +449,7 @@ class Scraper(object):
             greenlets = map(lambda i: Scraper(session=self._session,
                                               force_all=self._force_all
                                              ).scrape_async(i,
+                                                            id=req_id,
                                                             tags=tags,
                                                             input=input,
                                                             force=force,
