@@ -8,21 +8,16 @@ class Result(object):
     """
     def __init__(self, value, children=None):
         self._value = value
-        self._as_dict = {
-            'value': value
-        }
         if children is None:
             self._children = None
         else:
             if isinstance(children, list):
                 if len(children) > 0:
                     self._children = children
-                    self._as_dict['children'] = [child.as_dict() for child in children]
                 else:
                     self._children = None
             elif isinstance(children, Response):
                 self._children = [children]
-                self._as_dict['children'] = [children.as_dict()]
             else:
                 raise TypeError('result children must be response or list')
 
@@ -37,14 +32,23 @@ class Result(object):
     def children(self):
         return self._children
 
+    def _construct_dict(self):
+        d = {
+            'value': self._value
+        }
+        if self._children:
+            d['children'] = [child.as_dict() for child in self._children]
+        return d
+
     def as_dict(self, truncated=True):
-        if truncated == True and len(self._as_dict['value']) > 200:
-            val = self._as_dict['value']
-            as_dict = dict(self._as_dict)
+        as_dict = self._construct_dict()
+
+        if truncated == True and len(as_dict['value']) > 200:
+            val = as_dict['value']
             as_dict['value'] = val[:100] + '...' + val[-100:]
             return as_dict
         else:
-            return self._as_dict
+            return as_dict
 
 
 class Response(object):
@@ -55,12 +59,8 @@ class Response(object):
     def __init__(self, request):
         self._id = request.id
         self._uri = request.uri
+        self._tags = request.tags
         self._instruction = request.instruction
-        self._as_dict = {
-            'uri': self._uri,
-            'status': self.status,
-            'tags': request.tags
-        }
 
     def __str__(self):
         return json.dumps(self.as_dict(), default=lambda x: "Unencodable (%s)" % x)
@@ -84,8 +84,15 @@ class Response(object):
     def _status(self):
         raise NotImplementedError("Must use subclass")
 
+    def _construct_dict(self):
+        return {
+            'uri': self._uri,
+            'status': self.status,
+            'tags': self._tags
+        }
+
     def as_dict(self, truncated=True):
-        return self._as_dict
+        return self._construct_dict()
 
 
 class Ready(Response):
@@ -97,11 +104,15 @@ class Ready(Response):
         self._name = name
         self._description = description
         self._results = results
-        self._as_dict.update({
-            'name': name,
-            'description': description,
-            'results': [r.as_dict() for r in results]
+
+    def _construct_dict(self):
+        d = super(Ready, self)._construct_dict()
+        d.update({
+            'name': self._name,
+            'description': self._description,
+            'results': [r.as_dict() for r in self._results]
         })
+        return d
 
     @property
     def name(self):
@@ -166,9 +177,13 @@ class DoneLoad(Ready):
     def __init__(self, request, name, description, result, cookies):
         super(DoneLoad, self).__init__(request, name, description, [result])
         self._cookies = cookies
-        self._as_dict.update({
-            'cookies': cookies.get_dict()
+
+    def _construct_dict(self):
+        d = super(DoneLoad, self)._construct_dict()
+        d.update({
+            'cookies': self._cookies.get_dict()
         })
+        return d
 
     @property
     def cookies(self):
@@ -186,10 +201,14 @@ class Wait(Response):
         super(Wait, self).__init__(request)
         self._name = name
         self._description = description
-        self._as_dict.update({
-            'name': name,
-            'description': description
+
+    def _construct_dict(self):
+        d = super(Wait, self)._construct_dict()
+        d.update({
+            'name': self._name,
+            'description': self._description
         })
+        return d
 
     @property
     def name(self):
@@ -209,9 +228,13 @@ class MissingTags(Response):
     def __init__(self, request, missing_tags):
         super(MissingTags, self).__init__(request)
         self._missing_tags = missing_tags
-        self._as_dict.update({
-            'missing': missing_tags
+
+    def _construct_dict(self):
+        d = super(MissingTags, self)._construct_dict()
+        d.update({
+            'missing': self._missing_tags
         })
+        return d
 
     @property
     def missing_tags(self):
@@ -228,9 +251,13 @@ class Failed(Response):
     def __init__(self, request, reason):
         super(Failed, self).__init__(request)
         self._reason = reason
-        self._as_dict.update({
-            'failed': reason
+
+    def _construct_dict(self):
+        d = super(Failed, self)._construct_dict()
+        d.update({
+            'failed': self._reason
         })
+        return d
 
     @property
     def reason(self):

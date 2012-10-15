@@ -3,7 +3,50 @@
 import re
 import urllib
 import numbers
+from collections import MutableMapping
 from .errors import TemplateError, TemplateResultError
+
+class InheritedDict(MutableMapping):
+    """
+    A dict that falls back on its parents for all key-misses, but never
+    overwrites its parent.
+    """
+
+    def __init__(self, parent):
+        super(InheritedDict, self).__init__()
+        self._parent = parent
+        self._this = dict()
+
+    def __setitem__(self, k, v):
+        return self._this.__setitem__(k, v)
+
+    def __delitem__(self, k):
+        return self._this.__delitem__(k)
+
+    def __getitem__(self, k):
+        try:
+            return self._this.__getitem__(k)
+        except KeyError:
+            return self._parent.__getitem__(k)
+
+    def __len__(self, k):
+        parent_keys = set(self._parent.keys())
+        this_keys = set(self._this.keys())
+        return len(parent_keys.union(this_keys))
+
+    def __iter__(self):
+        """
+        Unclear how to iterate over this and not repeat elements.
+        """
+        raise NotImplementedError
+
+    def has_key(self, k):
+        this_has_key = self._this.has_key(k)
+        if this_has_key:
+            return this_has_key
+        else:
+            return self._parent.has_key(k)
+
 
 class Substitution(object):
     """

@@ -3,7 +3,6 @@
 import requests
 import grequests
 import uuid
-import copy
 import os
 import urlparse
 import json
@@ -13,8 +12,10 @@ from gevent.pool import Pool
 from .patterns import Regex
 from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
                          Failed, Result )
-from .templates import Substitution
+from .templates import Substitution, InheritedDict
 from .errors import InvalidInstructionError, SchemeSecurityError, PatternError
+
+CURDIR = os.getcwd()
 
 class Request(object):
 
@@ -26,7 +27,8 @@ class Request(object):
                             "read as input.  Please encode as UTF-8 to match on "
                             "extended characters.\n\nOffending string: %s" % input)
 
-        self._instruction = copy.deepcopy(instruction)
+        #self._instruction = copy.deepcopy(instruction)
+        self._instruction = instruction
         self._tags = tags
         self._input = input
         self._force = force
@@ -67,8 +69,9 @@ class Scraper(object):
         if session is None:
             self._session = requests.Session()
         else:
-            # We defensively deepcopy session -- advisable?
-            self._session = copy.deepcopy(session)
+            # We could defensively deepcopy session -- advisable?
+            #self._session = copy.deepcopy(session)
+            self._session = session
         self._force_all = force_all
 
     def _load_uri(self, base_uri, uri_to_resolve):
@@ -105,7 +108,7 @@ class Scraper(object):
             raise InvalidInstructionError("Couldn't load '%s': %s" % (resolved_uri, e))
         except IOError as e:
             raise InvalidInstructionError("Couldn't open '%s': %s" % (resolved_uri, e))
-        except ValueError:
+        except ValueError as e:
             raise InvalidInstructionError("Invalid JSON in '%s'" % resolved_uri)
 
     def _scrape_find(self, req, instruction, description, then):
@@ -180,7 +183,7 @@ class Scraper(object):
             # and with a modified set of tags.
             for i, s_unsubbed in enumerate(subs):
 
-                fork_tags = copy.deepcopy(req.tags)
+                fork_tags = InheritedDict(req.tags)
 
                 # Ensure we can use tag_match in children
                 if tag_match:
@@ -359,7 +362,6 @@ class Scraper(object):
 
         :returns: Response
         """
-        instruction = copy.deepcopy(instruction)
 
         while 'extends' in instruction:
             extends = instruction.pop('extends')
@@ -382,11 +384,11 @@ class Scraper(object):
 
         # Imperfect solution, but updating tags in request directly
         # should be safe at this point.
-        tags = instruction.pop('tags', {})
+        tags = instruction.get('tags', {})
         req.tags.update(tags)
 
-        then = instruction.pop('then', [])
-        description = instruction.pop('description', None)
+        then = instruction.get('then', [])
+        description = instruction.get('description', None)
 
         if 'find' in instruction:
             return self._scrape_find(req, instruction, description, then)
@@ -415,7 +417,7 @@ class Scraper(object):
 
         :returns: Response or list of Responses
         """
-        uri = kwargs.pop('uri', os.getcwd() + os.path.sep)
+        uri = kwargs.pop('uri', CURDIR + os.path.sep)
         req_id = kwargs.pop('id', str(uuid.uuid4()))
 
         # Override force with force_all
