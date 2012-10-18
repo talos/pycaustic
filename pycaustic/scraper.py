@@ -2,11 +2,11 @@
 
 import requests
 import grequests
-import uuid
 import os
 import urlparse
 import json
 import gevent
+import copy
 from gevent.pool import Pool
 
 from .patterns import Regex
@@ -16,6 +16,7 @@ from .templates import Substitution, InheritedDict
 from .errors import InvalidInstructionError, SchemeSecurityError, PatternError
 
 CURDIR = os.getcwd()
+FILE_CACHE = dict()
 
 class Request(object):
 
@@ -63,7 +64,6 @@ class Request(object):
 class Scraper(object):
 
     def __init__(self, session=None, force_all=False, concurrency=5):
-        self._file_cache = dict()
         self._pool = Pool(concurrency)
 
         if session is None:
@@ -93,12 +93,12 @@ class Scraper(object):
                 resolved_uri_str = urlparse.urlunsplit(resolved_uri)
 
                 # Use our file cache if we can
-                instruction = self._file_cache.get(resolved_uri_str)
+                instruction = copy.deepcopy(FILE_CACHE.get(resolved_uri_str))
 
                 # Otherwise, load and save in the cache
                 if instruction is None:
                     instruction = json.load(open(resolved_uri_str))
-                    self._file_cache[resolved_uri_str] = instruction
+                    FILE_CACHE[resolved_uri_str] = instruction
 
             else:
                 raise InvalidInstructionError("Reference to unsupported scheme '%s'" % (
