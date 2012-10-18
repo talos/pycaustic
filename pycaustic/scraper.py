@@ -8,6 +8,7 @@ import json
 import gevent
 import copy
 from gevent.pool import Pool
+from collections import OrderedDict
 
 from .patterns import Regex
 from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
@@ -16,7 +17,8 @@ from .templates import Substitution, InheritedDict
 from .errors import InvalidInstructionError, SchemeSecurityError, PatternError
 
 CURDIR = os.getcwd()
-FILE_CACHE = dict()
+FILE_CACHE = OrderedDict()
+MAX_FILE_CACHE_SIZE = 50
 
 class Request(object):
 
@@ -98,7 +100,9 @@ class Scraper(object):
                 # Otherwise, load and save in the cache
                 if instruction is None:
                     instruction = json.load(open(resolved_uri_str))
-                    FILE_CACHE[resolved_uri_str] = instruction
+                    FILE_CACHE[resolved_uri_str] = copy.deepcopy(instruction)
+                    if len(FILE_CACHE) > MAX_FILE_CACHE_SIZE:
+                        FILE_CACHE.popitem(last=False)
 
             else:
                 raise InvalidInstructionError("Reference to unsupported scheme '%s'" % (
