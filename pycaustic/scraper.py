@@ -157,9 +157,9 @@ class Scraper(object):
         try:
             min_match = int(min_match_sub.result)
             max_match = int(max_match_sub.result)
-        except ValueError:
-            return Failed("Min_match '%s' or max_match '%s' is not an int" % (
-                min_match.result, max_match.result))
+        except ValueError as e:
+            return Failed(req, "Min_match '%s' or max_match '%s' is not an int: %s" % (
+                min_match_sub.result, max_match_sub.result, e))
 
         # Python counts a little differently
         single_match = min_match == max_match
