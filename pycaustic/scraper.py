@@ -336,11 +336,12 @@ class Scraper(object):
                 if not isinstance(orig[ex_key], list):
                     orig[ex_key] = [orig[ex_key]]
 
-                # Use extend if the extension is also a list, append otherwise
+                # Insert values at beginning if extension is also list, append otherwise.
                 if isinstance(extension[ex_key], list):
-                    orig[ex_key].extend(extension[ex_key])
+                    for i, v in enumerate(extension[ex_key]):
+                        orig[ex_key].insert(i, v)
                 else:
-                    orig[ex_key].append(extension[ex_key])
+                    orig[ex_key].insert(0, extension[ex_key])
 
             # Clear out key for update at end
             extension.pop(ex_key)
@@ -358,8 +359,10 @@ class Scraper(object):
             else:
                 orig_val = orig[up_key]
                 up_val = extension[up_key]
+                # Prefer orig_val
                 if isinstance(orig_val, dict) and isinstance(up_val, dict):
-                    orig_val.update(up_val)
+                    up_val.update(orig_val)
+                    orig[up_key] = up_val
                 # Keep things available for total replacement.
                 else:
                     continue
