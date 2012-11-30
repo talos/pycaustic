@@ -166,7 +166,7 @@ class Scraper(object):
         join = join_sub.result
 
         # Python counts a little differently
-        single_match = min_match == max_match
+        single_match = min_match == max_match or join != None
         max_match = None if max_match == -1 else max_match + 1
 
         # Default to regex as string
