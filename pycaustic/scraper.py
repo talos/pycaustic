@@ -127,6 +127,7 @@ class Scraper(object):
         replace_unsubbed = instruction.get('replace', '$0')
         name_sub = Substitution(instruction.get('name'), tags)
         tag_match_sub = Substitution(instruction.get('tag_match'), tags)
+        join_sub = Substitution(instruction.get('join', None), tags)
         ignore_case = instruction.get('case_insensitive', False)
         multiline = instruction.get('multiline', False)
         dot_matches_all = instruction.get('dot_matches_all', True)
@@ -140,7 +141,8 @@ class Scraper(object):
         min_match_sub = Substitution(min_match_raw if match_raw is None else match_raw, tags)
         max_match_sub = Substitution(max_match_raw if match_raw is None else match_raw, tags)
 
-        substitutions = [find_sub, name_sub, min_match_sub, max_match_sub, tag_match_sub]
+        substitutions = [find_sub, name_sub, min_match_sub, max_match_sub, tag_match_sub,
+                         join_sub]
         # Parameterize input if it was supplied
         if 'input' in instruction:
             input_sub = Substitution(instruction['input'], tags)
@@ -160,6 +162,8 @@ class Scraper(object):
         except ValueError as e:
             return Failed(req, "Min_match '%s' or max_match '%s' is not an int: %s" % (
                 min_match_sub.result, max_match_sub.result, e))
+
+        join = join_sub.result
 
         # Python counts a little differently
         single_match = min_match == max_match
@@ -181,6 +185,10 @@ class Scraper(object):
             # Negative values mean we can't utilize the generator, sadly...
             else:
                 subs = [s for s in regex.substitutions(input)][min_match:max_match]
+
+            # Join subs into a single result.
+            if join:
+                subs = [join.join(subs)]
 
             greenlets = []
             replaced_subs = []

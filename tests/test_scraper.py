@@ -543,7 +543,7 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         characters as expected.
         """
         resp = Scraper().scrape({
-            "find": r'\w+',
+            "find": r'\S+',
             "name": "first name",
             "match": 0
         }, input='jos\xc3\xa9 alejandro')
@@ -571,6 +571,19 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
         # TODO: no "file:" scheme support, don't see any incentive for adding
         # it
         pass
+
+    def test_join(self):
+        """
+        For multi-match, is possible to join along some value.
+        """
+        resp = Scraper().scrape({
+            "find": r"\w+",
+            "name": "joined",
+            "join": ", and "
+        }, input="peter paul mary")
+        self.assertEquals({
+            "joined": "peter, and paul, and mary"
+        }, resp.flattened_values)
 
 
 if __name__ == '__main__':
