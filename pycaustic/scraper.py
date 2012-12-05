@@ -1,13 +1,10 @@
 # -*- coding: utf-8 -*-
 
 import requests
-import grequests
 import os
 import urlparse
 import json
-import gevent
 import copy
-from gevent.pool import Pool
 from collections import OrderedDict
 
 from .patterns import Regex
@@ -63,10 +60,37 @@ class Request(object):
         return self._uri
 
 
+class Loader(object):
+
+    def __init__(self):
+        self._gevent = None
+        self._grequests = None
+
+    @property
+    def gevent(self):
+        import pdb
+        pdb.set_trace()
+        if self._gevent == None:
+            import gevent
+            self._gevent = gevent
+        return self._gevent
+
+    @property
+    def grequests(self):
+        import pdb
+        pdb.set_trace()
+        if self._grequests == None:
+            import grequests
+            self._grequests = grequests
+        return self._grequests
+
+
+_loader = Loader()
+
 class Scraper(object):
 
-    def __init__(self, session=None, force_all=False, concurrency=5):
-        self._pool = Pool(concurrency)
+    def __init__(self, session=None, force_all=False, pool=None):
+        self._pool = pool
 
         if session is None:
             self._session = requests.Session()
@@ -223,7 +247,7 @@ class Scraper(object):
                     fork_tags[name] = s_subbed
 
                 if then:
-                    child_scraper = Scraper(session=self._session, force_all=self._force_all)
+                    child_scraper = Scraper(session=self._session, force_all=self._force_all, pool=self._pool)
                     greenlets.append(child_scraper.scrape_async(then,
                                                                 id=req.id,
                                                                 tags=fork_tags,
@@ -246,8 +270,10 @@ class Scraper(object):
             g = greenlets[i]
             if g == None:
                 child_resps = []
-            else:
+            elif self._pool:
                 child_resps = g.get()
+            else:
+                child_resps = g
             results.append(Result(replaced_sub, child_resps))
 
         return DoneFind(req, name, description, results)
@@ -297,11 +323,16 @@ class Scraper(object):
                 # Force use of POST if post-data was set.
                 method = 'post'
 
-            requester = getattr(grequests, method)
+            if self._pool is None:
+                requester = getattr(requests, method)
+                resp = requester(urlSub.result, **opts)
+            else:
+                grequests = _loader.grequests
+                requester = getattr(grequests, method)
 
-            greq = requester(urlSub.result, **opts)
-            greq.send()
-            resp = greq.response
+                greq = requester(urlSub.result, **opts)
+                greq.send()
+                resp = greq.response
 
             # Make sure we're using UTF-8
             if resp.encoding and resp.encoding.lower() == 'utf-8':
@@ -311,7 +342,7 @@ class Scraper(object):
 
             if resp.status_code == 200:
                 # Call children using the response text as input
-                child_scraper = Scraper(session=self._session, force_all=self._force_all)
+                child_scraper = Scraper(session=self._session, force_all=self._force_all, pool=self._pool)
 
                 scraper_results = child_scraper.scrape(then,
                                                        id=req.id,
@@ -461,17 +492,30 @@ class Scraper(object):
 
         # Handle each element of list separately within this context.
         if isinstance(instruction, list):
-            greenlets = map(lambda i: Scraper(session=self._session,
-                                              force_all=self._force_all
-                                             ).scrape_async(i,
-                                                            id=req_id,
-                                                            tags=tags,
-                                                            input=input,
-                                                            force=force,
-                                                            uri=uri),
-                            instruction)
-            gevent.joinall(greenlets)
-            return [g.get() for g in greenlets]
+            if self._pool is None:
+                return map(lambda i: Scraper(session=self._session,
+                                             force_all=self._force_all,
+                                             pool=self._pool
+                                            ).scrape(i,
+                                                     id=req_id,
+                                                     tags=tags,
+                                                     input=input,
+                                                     force=force,
+                                                     uri=uri),
+                           instruction)
+            else:
+                greenlets = map(lambda i: Scraper(session=self._session,
+                                                  force_all=self._force_all,
+                                                  pool = self._pool
+                                                 ).scrape_async(i,
+                                                                id=req_id,
+                                                                tags=tags,
+                                                                input=input,
+                                                                force=force,
+                                                                uri=uri),
+                                instruction)
+                _loader.gevent.joinall(greenlets)
+                return [g.get() for g in greenlets]
 
         # Dict instructions are ones we can actually handle
         elif isinstance(instruction, dict):
@@ -484,6 +528,10 @@ class Scraper(object):
     def scrape_async(self, instruction, tags={}, input='', force=False, **kwargs):
         """
         Scrape a request like `scrape`, except returns a greenlet which
-        supplies the Response or list of Responses from `get`.
+        supplies the Response or list of Responses from `get`.  If concurrency
+        was set to 1, then this works the same as scrape.
         """
-        return self._pool.spawn(self.scrape, instruction, tags, input, force=False, **kwargs)
+        if self._pool is None:
+            return self.scrape(instruction, tags, input, force=False, **kwargs)
+        else:
+            return self._pool.spawn(self.scrape, instruction, tags, input, force=False, **kwargs)
