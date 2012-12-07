@@ -68,8 +68,6 @@ class Loader(object):
 
     @property
     def gevent(self):
-        import pdb
-        pdb.set_trace()
         if self._gevent == None:
             import gevent
             self._gevent = gevent
@@ -77,8 +75,6 @@ class Loader(object):
 
     @property
     def grequests(self):
-        import pdb
-        pdb.set_trace()
         if self._grequests == None:
             import grequests
             self._grequests = grequests
