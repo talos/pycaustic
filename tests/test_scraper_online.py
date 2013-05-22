@@ -34,7 +34,7 @@ class TestScraperOnline(TestSetup, unittest.TestCase):
         We make a post request if any post-values were defined.
         """
         resp = Scraper().scrape({
-            'load': 'http://www.httpbin.org/post',
+            'load': 'http://httpbin.org/post',
             'posts': {
                 'roses': 'red',
                 'violets': 'blue'

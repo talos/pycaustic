@@ -311,24 +311,23 @@ class Scraper(object):
         headers = headersSub.result
 
         try:
-            opts = dict(cookies=cookies,
-                        headers=headers,
-                        session=self._session)
+            opts = dict(url=urlSub.result,
+                        cookies=cookies,
+                        headers=headers)
             if method == 'post' or posts:
                 opts['data'] = posts
                 # Force use of POST if post-data was set.
-                method = 'post'
+                opts['method'] = 'post'
 
             if self._pool is None:
-                requester = getattr(requests, method)
-                resp = requester(urlSub.result, **opts)
+                prepared_req = requests.Request(**opts).prepare()
+                resp = self._session.send(prepared_req)
             else:
                 grequests = _loader.grequests
-                requester = getattr(grequests, method)
-
-                greq = requester(urlSub.result, **opts)
-                greq.send()
-                resp = greq.response
+                async_req = grequests.AsyncRequest(session=self._session,
+                                                   **opts)
+                async_req.send()
+                resp = async_req.response
 
             # Make sure we're using UTF-8
             if resp.encoding and resp.encoding.lower() == 'utf-8':
