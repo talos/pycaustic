@@ -313,7 +313,8 @@ class Scraper(object):
         try:
             opts = dict(url=urlSub.result,
                         cookies=cookies,
-                        headers=headers)
+                        headers=headers,
+                        method=method)
             if method == 'post' or posts:
                 opts['data'] = posts
                 # Force use of POST if post-data was set.
