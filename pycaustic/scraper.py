@@ -135,7 +135,7 @@ class Scraper(object):
         except ValueError as e:
             raise InvalidInstructionError("Invalid JSON in '%s'" % resolved_uri)
 
-    def _scrape_find(self, req, instruction, description, then):
+    def _scrape_find(self, req, instruction, description, then, else_):
         """
         Scrape a find instruction
         """
@@ -255,8 +255,15 @@ class Scraper(object):
             return Failed(req, "'%s' failed because of %s" % (instruction['find'], e))
 
         if len(greenlets) == 0:
-            return Failed(req, "No matches for '%s', evaluated to '%s'" % (
-                instruction['find'], find_sub.result))
+            if else_:
+                return self.scrape_async(else_,
+                                         id=req.id,
+                                         tags=tags,
+                                         input=input,
+                                         uri=req.uri)
+            else:
+                return Failed(req, "No matches for '%s', evaluated to '%s'" % (
+                    instruction['find'], find_sub.result))
 
         #gevent.joinall(greenlets)
 
@@ -440,10 +447,11 @@ class Scraper(object):
         req.tags.update(tags)
 
         then = instruction.get('then', [])
+        else_ = instruction.get('else', [])
         description = instruction.get('description', None)
 
         if 'find' in instruction:
-            return self._scrape_find(req, instruction, description, then)
+            return self._scrape_find(req, instruction, description, then, else_)
         elif 'load' in instruction:
             return self._scrape_load(req, instruction, description, then)
         else:

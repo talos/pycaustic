@@ -585,6 +585,25 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "joined": "peter, and paul, and mary"
         }, resp.flattened_values)
 
+    def test_else(self):
+        """
+        If no matches, execute 'else' in find.
+        """
+        resp = Scraper().scrape({
+            "find": r"\d+",
+            "name": "numbers",
+            "else": {
+                "name": "words",
+                "find": r"\w+"
+            }
+        }, input="peter paul mary")
+        self.assertEquals( [{
+            "words": "peter"
+        }, {
+            "words": "paul"
+        }, {
+            "words": "mary"
+        }], resp.flattened_values)
 
 if __name__ == '__main__':
     unittest.main()
