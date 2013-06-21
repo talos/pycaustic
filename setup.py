@@ -28,6 +28,10 @@ setup(
     url='http://github.com/talos/pycaustic',
     packages=packages,
     license='BSD',
+    install_requires=(
+        'jsonpath-rw',
+        'lxml'
+    ),
     classifiers=(
         'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',

@@ -668,6 +668,22 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "bullet": "third"
         }], resp.flattened_values)
 
+    def test_xpath_multiple_ranged(self):
+        """
+        Xpath can provide multiple values, limited by min/max.
+        """
+        resp = Scraper().scrape({
+            "name": "bullet",
+            "xpath": "//ul/li",
+            "min_match": 1,
+            "max_match": 2
+        }, input="<ul><li>first<li>second<li>third<li>fourth</ul>")
+        self.assertEquals([{
+            "bullet": "second"
+        }, {
+            "bullet": "third"
+        }], resp.flattened_values)
+
     def test_xpath_multiple_nested(self):
         """
         Xpath can provide multiple values, which could then be nested.
@@ -691,6 +707,77 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "first letter": "t",
             "bullet": "third"
         }], resp.flattened_values)
+
+    def test_jsonpath_expr(self):
+        """
+        Can find values via jsonpath.
+        """
+        resp = Scraper().scrape({
+            "name": "foo_value",
+            "jsonpath": "$.foo"
+        }, input=json.dumps({"foo":"bar"}))
+        self.assertEquals({
+            "foo_value": "bar"
+        }, resp.flattened_values)
+
+    def test_jsonpath_expr_multiple(self):
+        """
+        Can find multiple values via jsonpath.
+        """
+        resp = Scraper().scrape({
+            "name": "bar_value",
+            "jsonpath": "foo[*].baz"
+        }, input=json.dumps({'foo': [{'baz': 1}, {'baz': 2}]}))
+        self.assertEquals([{
+            "bar_value": "1"
+        }, {
+            "bar_value": "2"
+        }], resp.flattened_values)
+
+    def test_jsonpath_expr_multiple_range(self):
+        """
+        Can find multiple values via jsonpath, limited by range.
+        """
+        resp = Scraper().scrape({
+            "name": "bar_value",
+            "jsonpath": "foo[*].baz",
+            "min_match": 1,
+            "max_match": 2
+        }, input=json.dumps({'foo': [{'baz': 1},
+                                     {'baz': 2},
+                                     {'baz': 3},
+                                     {'baz': 4}]}))
+        self.assertEquals([{
+            "bar_value": "2"
+        }, {
+            "bar_value": "3"
+        }], resp.flattened_values)
+
+    def test_jsonpath_bad_expr(self):
+        """
+        Fails gracefully on bad jsonpath expression
+        """
+        bad_expr = "??dklskdjglks<<CVJ"
+        resp = Scraper().scrape({
+            "name": "foo_value",
+            "jsonpath": bad_expr
+        }, input=json.dumps({"foo":"bar"}))
+        self.assertEquals('failed', resp.status)
+        self.assertEquals("'" + bad_expr +
+                          "' failed because it is not a valid jsonpath expression", resp.reason)
+
+    def test_jsonpath_bad_input(self):
+        """
+        Fails gracefully on bad jsonpath expression
+        """
+        bad_input = "[[gidjs kj AINT JSON"
+        resp = Scraper().scrape({
+            "name": "foo_value",
+            "jsonpath": "$.foo"
+        }, input=bad_input)
+        self.assertEquals('failed', resp.status)
+        self.assertEquals("'$.foo' failed because its input '" + bad_input + "' was not JSON",
+                          resp.reason)
 
 if __name__ == '__main__':
     unittest.main()

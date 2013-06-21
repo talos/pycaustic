@@ -6,6 +6,7 @@ import os
 import requests
 import urlparse
 
+from jsonpath_rw import parse as jsonpath_parse
 from collections import OrderedDict
 from lxml import etree
 
@@ -137,15 +138,15 @@ class Scraper(object):
         except ValueError as e:
             raise InvalidInstructionError("Invalid JSON in '%s'" % resolved_uri)
 
-    def _scrape_find_or_xpath(self, req, instruction, description, then, else_):
+    def _scrape_find(self, req, instruction, description, then, else_):
         """
         Scrape a find instruction
         """
-        if 'find' in instruction and 'xpath' in instruction:
-            raise InvalidInstructionError("Cannot have both 'find' and 'xpath' in instruction")
+        if sum(('find' in instruction, 'xpath' in instruction, 'jsonpath' in instruction, )) > 1:
+            raise InvalidInstructionError("Conflicting find/xpath/jsonpath")
 
         tags = req.tags
-        xpath_sub, find_sub = (None, None)
+        xpath_sub, find_sub, jsonpath_sub = (None, None, None)
         if 'find' in instruction:
             k = 'find'
             find_sub = Substitution(instruction[k], tags)
@@ -158,8 +159,10 @@ class Scraper(object):
             k = 'xpath'
             xpath_sub = Substitution(instruction[k], tags)
             k_sub = xpath_sub
-        else:
-            raise InvalidInstructionError("Missing regex")
+        elif 'jsonpath' in instruction:
+            k = 'jsonpath'
+            jsonpath_sub = Substitution(instruction[k], tags)
+            k_sub = jsonpath_sub
 
         tag_match_sub = Substitution(instruction.get('tag_match'), tags)
         name_sub = Substitution(instruction.get('name'), tags)
@@ -224,11 +227,26 @@ class Scraper(object):
         elif xpath_sub:
             try:
                 tree = etree.HTML(input)
-                subs = [m.text for m in tree.xpath(xpath_sub.result)]
+                subs = [m.text for m in tree.xpath(xpath_sub.result)][min_match:max_match]
 
             except etree.XPathEvalError as e:
                 return Failed(req, "'%s' failed because of %s" % (instruction[k],
                                                                   str(e)))
+
+        elif jsonpath_sub:
+            try:
+                json_input = json.loads(input)
+            except ValueError as e:
+                return Failed(req, "'%s' failed because its input '%s' was not JSON" % (
+                    instruction[k], input[:200]))
+
+            try:
+                jsonpath_expr = jsonpath_parse(jsonpath_sub.result)
+            except:
+                return Failed(req, "'%s' failed because it is not a valid jsonpath expression" % (
+                    instruction[k]))
+
+            subs = [m.value for m in jsonpath_expr.find(json_input)][min_match:max_match]
 
         # Join subs into a single result.
         if join:
@@ -472,8 +490,8 @@ class Scraper(object):
         else_ = instruction.get('else', [])
         description = instruction.get('description', None)
 
-        if 'find' in instruction or 'xpath' in instruction:
-            return self._scrape_find_or_xpath(req, instruction, description, then, else_)
+        if 'find' in instruction or 'xpath' in instruction or 'jsonpath' in instruction:
+            return self._scrape_find(req, instruction, description, then, else_)
         elif 'load' in instruction:
             return self._scrape_load(req, instruction, description, then)
         else:
