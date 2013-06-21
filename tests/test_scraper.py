@@ -605,5 +605,92 @@ class TestScraper(TestSetup, StubMixin, unittest.TestCase):
             "words": "mary"
         }], resp.flattened_values)
 
+    def test_xpath_instruction(self):
+        """
+        Possible to locate content using xpath.
+        """
+        resp = Scraper().scrape({
+            "name": "second verse",
+            "xpath": "//p[2]"
+        }, input="<p>first verse</p><p>same as the first</p>")
+        self.assertEquals({
+            "second verse": "same as the first"
+        }, resp.flattened_values)
+
+    def test_xpath_invalid_expression(self):
+        """
+        Handle failure on xpath expression.
+        """
+        invalid = "*sd8g88**"
+        resp = Scraper().scrape({
+            "name": "second verse",
+            "xpath": "*sd8g88**"
+        }, input="<p>first verse</p><p>same as the first</p>")
+        self.assertEquals('failed', resp.status)
+        self.assertEquals("'" + invalid + "' failed because of Invalid expression", resp.reason)
+
+    def test_xpath_instruction_nomatch(self):
+        """
+        Handle failure on xpath not matching.
+        """
+        resp = Scraper().scrape({
+            "name": "second verse",
+            "xpath": "//p[3]"
+        }, input="<p>first verse</p><p>same as the first</p>")
+        self.assertEquals('failed', resp.status)
+        self.assertEquals("No matches for '//p[3]', evaluated to '//p[3]'", resp.reason)
+
+    def test_xpath_invalid_source(self):
+        """
+        Handles garbage (kind of) gracefully.
+        """
+        resp = Scraper().scrape({
+            "name": "huh",
+            "xpath": "//attr"
+        }, input="<attr= f'''oo<This ??> could < not be attr='html?  !!> no way")
+        self.assertEquals({
+            "huh": " could  no way"
+        }, resp.flattened_values)
+
+    def test_xpath_multiple(self):
+        """
+        Xpath can provide multiple values.
+        """
+        resp = Scraper().scrape({
+            "name": "bullet",
+            "xpath": "//ul/li"
+        }, input="<ul><li>first<li>second<li>third</ul>")
+        self.assertEquals([{
+            "bullet": "first"
+        }, {
+            "bullet": "second"
+        }, {
+            "bullet": "third"
+        }], resp.flattened_values)
+
+    def test_xpath_multiple_nested(self):
+        """
+        Xpath can provide multiple values, which could then be nested.
+        """
+        resp = Scraper().scrape({
+            "name": "bullet",
+            "xpath": "//ul/li",
+            "then": {
+                "find": r"^\w",
+                "match": 0,
+                "name": "first letter"
+            }
+        }, input="<ul><li>first<li>second<li>third</ul>")
+        self.assertEquals([{
+            "first letter": "f",
+            "bullet": "first"
+        }, {
+            "first letter": "s",
+            "bullet": "second"
+        }, {
+            "first letter": "t",
+            "bullet": "third"
+        }], resp.flattened_values)
+
 if __name__ == '__main__':
     unittest.main()

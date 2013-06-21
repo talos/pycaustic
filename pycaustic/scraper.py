@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
 
-import requests
-import os
-import urlparse
-import json
 import copy
+import json
+import os
+import requests
+import urlparse
+
 from collections import OrderedDict
+from lxml import etree
 
 from .patterns import Regex
 from .responses import ( DoneLoad, DoneFind, Wait, MissingTags,
@@ -135,22 +137,33 @@ class Scraper(object):
         except ValueError as e:
             raise InvalidInstructionError("Invalid JSON in '%s'" % resolved_uri)
 
-    def _scrape_find(self, req, instruction, description, then, else_):
+    def _scrape_find_or_xpath(self, req, instruction, description, then, else_):
         """
         Scrape a find instruction
         """
-        if 'find' not in instruction:
-            raise InvalidInstructionError("Missing regex")
+        if 'find' in instruction and 'xpath' in instruction:
+            raise InvalidInstructionError("Cannot have both 'find' and 'xpath' in instruction")
 
         tags = req.tags
-        find_sub = Substitution(instruction['find'], tags)
-        replace_unsubbed = instruction.get('replace', '$0')
-        name_sub = Substitution(instruction.get('name'), tags)
+        xpath_sub, find_sub = (None, None)
+        if 'find' in instruction:
+            k = 'find'
+            find_sub = Substitution(instruction[k], tags)
+            k_sub = find_sub
+            replace_unsubbed = instruction.get('replace', '$0')
+            ignore_case = instruction.get('case_insensitive', False)
+            multiline = instruction.get('multiline', False)
+            dot_matches_all = instruction.get('dot_matches_all', True)
+        elif 'xpath' in instruction:
+            k = 'xpath'
+            xpath_sub = Substitution(instruction[k], tags)
+            k_sub = xpath_sub
+        else:
+            raise InvalidInstructionError("Missing regex")
+
         tag_match_sub = Substitution(instruction.get('tag_match'), tags)
+        name_sub = Substitution(instruction.get('name'), tags)
         join_sub = Substitution(instruction.get('join', None), tags)
-        ignore_case = instruction.get('case_insensitive', False)
-        multiline = instruction.get('multiline', False)
-        dot_matches_all = instruction.get('dot_matches_all', True)
 
         # Default to full range
         min_match_raw = instruction.get('min_match', 0)
@@ -162,7 +175,7 @@ class Scraper(object):
         max_match_sub = Substitution(max_match_raw if match_raw is None else match_raw, tags)
 
         substitutions = [find_sub, name_sub, min_match_sub, max_match_sub, tag_match_sub,
-                         join_sub]
+                         join_sub, xpath_sub]
         # Parameterize input if it was supplied
         if 'input' in instruction:
             input_sub = Substitution(instruction['input'], tags)
@@ -185,74 +198,83 @@ class Scraper(object):
 
         join = join_sub.result
 
-        # Python counts a little differently
+        # Python counts a little differently than Java did
         single_match = min_match == max_match or join != None
         max_match = None if max_match == -1 else max_match + 1
 
-        # Default to regex as string
         name = name_sub.result if name_sub.result else None
 
-        tag_match = tag_match_sub.result
         tags = req.tags
+        tag_match = tag_match_sub.result
 
-        try:
-            regex = Regex(find_sub.result, ignore_case, multiline, dot_matches_all,
-                          replace_unsubbed)
+        if find_sub:
+            try:
+                regex = Regex(find_sub.result, ignore_case, multiline, dot_matches_all,
+                              replace_unsubbed)
 
-            # This lets through max_match = None, which is OK for generator
-            if min_match > -1 and max_match > -1:
-                subs = regex.substitutions(input, min_match, max_match)
-            # Negative values mean we can't utilize the generator, sadly...
+                # This lets through max_match = None, which is OK for generator
+                if min_match > -1 and max_match > -1:
+                    subs = regex.substitutions(input, min_match, max_match)
+                # Negative values mean we can't utilize the generator, sadly...
+                else:
+                    subs = [s for s in regex.substitutions(input)][min_match:max_match]
+            except PatternError as e:
+                return Failed(req, "'%s' failed because of %s" % (instruction[k], e))
+
+        elif xpath_sub:
+            try:
+                tree = etree.HTML(input)
+                subs = [m.text for m in tree.xpath(xpath_sub.result)]
+
+            except etree.XPathEvalError as e:
+                return Failed(req, "'%s' failed because of %s" % (instruction[k],
+                                                                  str(e)))
+
+        # Join subs into a single result.
+        if join:
+            subs = [join.join(subs)]
+
+        greenlets = []
+        replaced_subs = []
+        # Call children once for each substitution, using it as input
+        # and with a modified set of tags.
+        for i, s_unsubbed in enumerate(subs):
+
+            fork_tags = InheritedDict(tags)
+
+            # Ensure we can use tag_match in children
+            if tag_match:
+                fork_tags[tag_match] = str(i)
+
+            # Fail out if unable to replace.
+            s_sub = Substitution(s_unsubbed, fork_tags)
+            if s_sub.missing_tags:
+                return MissingTags(req, s_sub.missing_tags)
             else:
-                subs = [s for s in regex.substitutions(input)][min_match:max_match]
+                s_subbed = s_sub.result
+                replaced_subs.append(s_subbed)
 
-            # Join subs into a single result.
-            if join:
-                subs = [join.join(subs)]
+            # actually modify our available tags if it was 1-to-1
+            if single_match and name is not None:
+                tags[name] = s_subbed
 
-            greenlets = []
-            replaced_subs = []
-            # Call children once for each substitution, using it as input
-            # and with a modified set of tags.
-            for i, s_unsubbed in enumerate(subs):
-
-                fork_tags = InheritedDict(tags)
-
-                # Ensure we can use tag_match in children
+                # The tag_match name is chosen in instruction, so it's OK
+                # to propagate it -- no pollution risk
                 if tag_match:
-                    fork_tags[tag_match] = str(i)
+                    tags[tag_match] = str(i)
 
-                # Fail out if unable to replace.
-                s_sub = Substitution(s_unsubbed, fork_tags)
-                if s_sub.missing_tags:
-                    return MissingTags(req, s_sub.missing_tags)
-                else:
-                    s_subbed = s_sub.result
-                    replaced_subs.append(s_subbed)
+            if name is not None:
+                fork_tags[name] = s_subbed
 
-                # actually modify our available tags if it was 1-to-1
-                if single_match and name is not None:
-                    tags[name] = s_subbed
-
-                    # The tag_match name is chosen in instruction, so it's OK
-                    # to propagate it -- no pollution risk
-                    if tag_match:
-                        tags[tag_match] = str(i)
-
-                if name is not None:
-                    fork_tags[name] = s_subbed
-
-                if then:
-                    child_scraper = Scraper(session=self._session, force_all=self._force_all, pool=self._pool)
-                    greenlets.append(child_scraper.scrape_async(then,
-                                                                id=req.id,
-                                                                tags=fork_tags,
-                                                                input=s_subbed,
-                                                                uri=req.uri))
-                else:
-                    greenlets.append(None)
-        except PatternError as e:
-            return Failed(req, "'%s' failed because of %s" % (instruction['find'], e))
+            if then:
+                child_scraper = Scraper(session=self._session, force_all=self._force_all, pool=self._pool)
+                greenlets.append(child_scraper.scrape_async(then,
+                                                            id=req.id,
+                                                            tags=fork_tags,
+                                                            input=s_subbed,
+                                                            uri=req.uri))
+            else:
+                greenlets.append(None)
 
         if len(greenlets) == 0:
             if else_:
@@ -263,7 +285,7 @@ class Scraper(object):
                                          uri=req.uri)
             else:
                 return Failed(req, "No matches for '%s', evaluated to '%s'" % (
-                    instruction['find'], find_sub.result))
+                    instruction[k], k_sub.result))
 
         #gevent.joinall(greenlets)
 
@@ -450,8 +472,8 @@ class Scraper(object):
         else_ = instruction.get('else', [])
         description = instruction.get('description', None)
 
-        if 'find' in instruction:
-            return self._scrape_find(req, instruction, description, then, else_)
+        if 'find' in instruction or 'xpath' in instruction:
+            return self._scrape_find_or_xpath(req, instruction, description, then, else_)
         elif 'load' in instruction:
             return self._scrape_load(req, instruction, description, then)
         else:

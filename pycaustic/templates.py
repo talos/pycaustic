@@ -112,11 +112,12 @@ class Substitution(object):
     @classmethod
     def add_missing(cls, *substitutions):
         """
-        Add together all the missing tags from a series of substitutions
+        Add together all the missing tags from a series of substitutions.
+        Ignores any 'None' in the list of args.
         """
         missing_tags = []
         for sub in substitutions:
-            if sub.missing_tags:
+            if sub and sub.missing_tags:
                 missing_tags.append(sub.missing_tags)
         return missing_tags
 
